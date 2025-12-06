@@ -63,7 +63,7 @@ publishing {
                     developer {
                         id.set("respectlytics")
                         name.set("Respectlytics")
-                        email.set("support@respectlytics.com")
+                        email.set("respectlytics@loheden.com")
                     }
                 }
                 
@@ -79,7 +79,7 @@ publishing {
     repositories {
         maven {
             name = "OSSRH"
-            url = uri("https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/")
+            url = uri("https://ossrh-staging-api.central.sonatype.com/service/local/staging/deploy/maven2/")
             credentials {
                 username = project.findProperty("ossrhUsername") as String? ?: ""
                 password = project.findProperty("ossrhPassword") as String? ?: ""
@@ -89,5 +89,6 @@ publishing {
 }
 
 signing {
+    useGpgCmd()
     sign(publishing.publications["maven"])
 }
