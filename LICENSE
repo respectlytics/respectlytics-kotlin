@@ -1,0 +1,24 @@
+Respectlytics SDK License
+Copyright (c) 2025 Respectlytics. All rights reserved.
+
+PERMITTED USES:
+- View and read the source code for transparency and security review
+- Install the SDK via official package managers (Maven Central)
+- Use the SDK to send analytics data to the official Respectlytics service
+
+PROHIBITED USES:
+- Copying, forking, or redistributing the source code
+- Modifying the SDK source code
+- Using the SDK with any backend other than the official Respectlytics API
+- Creating derivative works based on this SDK
+- Reverse engineering beyond what is necessary for interoperability
+
+NO WARRANTY:
+This SDK is provided "as is" without warranty of any kind. Respectlytics
+shall not be liable for any damages arising from the use of this SDK.
+
+TERMINATION:
+This license terminates automatically if you violate any of its terms.
+Upon termination, you must cease all use and destroy all copies.
+
+For licensing inquiries: respectlytics@loheden.com
