@@ -1,0 +1,12 @@
+.gradle/
+build/
+.env.testing
+.env
+*.iml
+.idea/
+local.properties
+.DS_Store
+out/
+*.jar
+*.class
+.gradle-dist/
