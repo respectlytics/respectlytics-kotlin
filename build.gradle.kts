@@ -35,7 +35,7 @@ java {
 }
 
 tasks.test {
-    useJUnitPlatform()
+    useJUnit()
 }
 
 publishing {
