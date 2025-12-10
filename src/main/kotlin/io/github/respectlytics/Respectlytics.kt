@@ -7,28 +7,34 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 /**
- * Respectlytics Analytics SDK - Privacy-first analytics for JVM/Android
+ * Respectlytics Analytics SDK v2.0.0 - Privacy-first analytics for JVM/Android
  * 
  * This is the main entry point for the Respectlytics SDK. All public API methods
  * are accessed through this singleton object.
+ * 
+ * v2.0.0 Features:
+ * - Session-based analytics only (no user tracking)
+ * - RAM-only session storage (nothing written to disk)
+ * - 2-hour automatic session rotation
+ * - New session on every app launch
+ * - Designed for GDPR/ePrivacy compliance
  * 
  * Usage:
  * ```kotlin
  * // 1. Configure (call once at app launch)
  * Respectlytics.configure(Configuration(apiKey = "your-api-key"))
  * 
- * // 2. Enable user tracking (optional)
- * Respectlytics.identify("user-123")
- * 
- * // 3. Track events
+ * // 2. Track events
  * Respectlytics.track("purchase")
  * Respectlytics.track("button_click", mapOf("screen" to "checkout"))
+ * 
+ * // 3. Optionally force flush before app termination
+ * Respectlytics.flush()
  * ```
  */
 object Respectlytics {
     private var storage: Storage? = null
     private var sessionManager: SessionManager? = null
-    private var userManager: UserManager? = null
     private var eventQueue: EventQueue? = null
     private var configuration: Configuration? = null
     
@@ -52,13 +58,12 @@ object Respectlytics {
         
         // Initialize components
         storage = Storage()
-        sessionManager = SessionManager(storage!!, config.sessionTimeout)
-        userManager = UserManager(storage!!)
+        sessionManager = SessionManager(config.sessionDuration)
         
         val networkClient = OkHttpNetworkClient(config)
         eventQueue = EventQueue(storage!!, networkClient, config)
         
-        log("✓ SDK configured successfully")
+        log("✓ SDK configured successfully (v2.0.0 - Session-based analytics)")
     }
     
     /**
@@ -89,7 +94,6 @@ object Respectlytics {
                 eventName = eventName,
                 properties = properties,
                 sessionId = sessionManager!!.getSessionId(),
-                userId = userManager!!.getUserId(),
                 timestamp = getCurrentTimestamp(),
                 platform = "kotlin",
                 appVersion = getAppVersion(),
@@ -101,45 +105,6 @@ object Respectlytics {
         } catch (e: Exception) {
             logWarning("Failed to track event: ${e.message}")
         }
-    }
-    
-    /**
-     * Associate a custom user ID with events.
-     * 
-     * This is typically called after user authentication to link events to a known user.
-     * The user ID will persist across app sessions until reset() is called.
-     * 
-     * @param userId Custom user ID (e.g., database ID, email hash)
-     * @throws IllegalStateException if SDK not configured
-     * @throws IllegalArgumentException if userId is blank
-     */
-    @JvmStatic
-    fun identify(userId: String) {
-        requireConfigured()
-        
-        try {
-            userManager!!.identify(userId)
-            log("✓ User identified: $userId")
-        } catch (e: IllegalArgumentException) {
-            logWarning("Invalid user ID: ${e.message}")
-        }
-    }
-    
-    /**
-     * Reset user data, clearing the user ID.
-     * 
-     * This should be called when a user logs out. A new user ID will be
-     * generated automatically on the next event.
-     * 
-     * @throws IllegalStateException if SDK not configured
-     */
-    @JvmStatic
-    fun reset() {
-        requireConfigured()
-        
-        userManager!!.reset()
-        sessionManager!!.reset()
-        log("✓ User data reset")
     }
     
     /**
@@ -200,5 +165,20 @@ object Respectlytics {
     
     private fun logWarning(message: String) {
         System.err.println("[$TAG] ⚠️ $message")
+    }
+    
+    // --- Testing Support ---
+    
+    /**
+     * Reset the SDK state. FOR TESTING ONLY.
+     * This clears all internal state and allows reconfiguration.
+     */
+    @JvmStatic
+    internal fun resetForTesting() {
+        storage?.clear()
+        storage = null
+        sessionManager = null
+        eventQueue = null
+        configuration = null
     }
 }

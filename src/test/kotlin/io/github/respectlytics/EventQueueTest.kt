@@ -30,7 +30,7 @@ class EventQueueTest {
         return Event(
             eventName = name,
             sessionId = "test-session",
-            userId = "test-user",
+            
             timestamp = "2025-12-06T10:00:00Z"
         )
     }

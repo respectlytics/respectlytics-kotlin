@@ -1,7 +1,6 @@
 package io.github.respectlytics
 
 import org.junit.After
-import org.junit.Before
 import org.junit.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -13,18 +12,8 @@ class RespectlyticsTest {
     
     @After
     fun teardown() {
-        // Reset Respectlytics state using reflection
-        val fields = Respectlytics::class.java.declaredFields
-        for (field in fields) {
-            if (field.name.endsWith("configuration") || 
-                field.name.endsWith("storage") ||
-                field.name.endsWith("sessionManager") ||
-                field.name.endsWith("userManager") ||
-                field.name.endsWith("eventQueue")) {
-                field.isAccessible = true
-                field.set(null, null)
-            }
-        }
+        // Reset Respectlytics state using the internal method
+        Respectlytics.resetForTesting()
     }
     
     @Test
@@ -117,47 +106,6 @@ class RespectlyticsTest {
     }
     
     @Test
-    fun `test identify throws exception if not configured`() {
-        assertFailsWith<IllegalStateException> {
-            Respectlytics.identify("user-123")
-        }
-    }
-    
-    @Test
-    fun `test identify with valid user ID succeeds`() {
-        val config = Configuration(apiKey = testApiKey)
-        Respectlytics.configure(config)
-        
-        // Should not throw
-        Respectlytics.identify("user-123")
-    }
-    
-    @Test
-    fun `test identify with empty user ID fails gracefully`() {
-        val config = Configuration(apiKey = testApiKey)
-        Respectlytics.configure(config)
-        
-        // Should not throw, but should log warning
-        Respectlytics.identify("")
-    }
-    
-    @Test
-    fun `test reset throws exception if not configured`() {
-        assertFailsWith<IllegalStateException> {
-            Respectlytics.reset()
-        }
-    }
-    
-    @Test
-    fun `test reset succeeds when configured`() {
-        val config = Configuration(apiKey = testApiKey)
-        Respectlytics.configure(config)
-        
-        // Should not throw
-        Respectlytics.reset()
-    }
-    
-    @Test
     fun `test flush throws exception if not configured`() {
         assertFailsWith<IllegalStateException> {
             Respectlytics.flush()
@@ -219,17 +167,43 @@ class RespectlyticsTest {
     }
     
     @Test
-    fun `test reset clears user and session data`() {
+    fun `test reconfigure is allowed`() {
+        // Configure once
+        val config1 = Configuration(apiKey = testApiKey)
+        Respectlytics.configure(config1)
+        assertTrue(Respectlytics.isConfigured())
+        
+        // Configure again (allowed in SDK)
+        val config2 = Configuration(apiKey = "different-key")
+        Respectlytics.configure(config2)
+        assertTrue(Respectlytics.isConfigured())
+    }
+    
+    @Test
+    fun `test resetForTesting clears configuration`() {
+        val config = Configuration(apiKey = testApiKey)
+        Respectlytics.configure(config)
+        assertTrue(Respectlytics.isConfigured())
+        
+        Respectlytics.resetForTesting()
+        assertFalse(Respectlytics.isConfigured())
+    }
+    
+    @Test
+    fun `test session based analytics - no identify or reset methods`() {
+        // This test documents the v2.0.0 API surface
+        // Only configure, track, flush, isConfigured are public
         val config = Configuration(apiKey = testApiKey)
         Respectlytics.configure(config)
         
-        // Identify user
-        Respectlytics.identify("user-123")
+        // v2.0.0: These methods no longer exist
+        // Respectlytics.identify() - REMOVED
+        // Respectlytics.reset() - REMOVED
         
-        // Reset
-        Respectlytics.reset()
+        // Only track and flush remain as public API
+        Respectlytics.track("session_event")
+        Respectlytics.flush()
         
-        // Should still be configured
         assertTrue(Respectlytics.isConfigured())
     }
 }

@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.0] - 2025-12-10
+
+### ⚠️ Breaking Changes
+- **REMOVED**: `identify(userId)` method - User identification no longer supported
+- **REMOVED**: `reset()` method - No user state to reset
+- **REMOVED**: `UserManager` class - No longer needed
+- **REMOVED**: `user_id` field from Event - Session-based only
+- **CHANGED**: `sessionTimeout` renamed to `sessionDuration` in Configuration
+- **CHANGED**: Default session duration changed from 30 minutes to 2 hours
+
+### Added
+- RAM-only session storage - Session IDs never written to disk
+- Automatic 2-hour session rotation
+- New session generated on every app launch
+- `forceNewSession()` internal method for testing
+- `getTimeRemainingMs()` internal method for session inspection
+- `resetForTesting()` method for test isolation
+
+### Changed
+- `SessionManager` now initializes session immediately at construction
+- `SessionManager` no longer uses Storage for persistence
+- Configuration parameter renamed: `sessionTimeout` → `sessionDuration`
+- SDK log message now shows version: "v2.0.0 - Session-based analytics"
+
+### Privacy Improvements
+- No persistent identifiers stored on device
+- Designed for GDPR/ePrivacy Directive compliance
+- No consent banner required (no device storage)
+- Cannot track users across app launches by design
+
+### Migration Guide
+Remove calls to `identify()` and `reset()` - they no longer exist:
+```diff
+  Respectlytics.configure(Configuration(apiKey = "your-api-key"))
+- Respectlytics.identify("user-123")
+  Respectlytics.track("purchase")
+- Respectlytics.reset()
+```
+
 ## [1.0.0] - 2025-12-06
 
 ### Added
@@ -27,26 +66,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automatic metadata collection (timestamp, session_id, platform, os_version, app_version, locale, device_type)
 - Privacy by design - no device identifiers, no IP logging, minimal data collection
 - JVM and Android compatibility (API 24+)
-- 90 comprehensive unit tests
-- 6 integration tests against Django API
-- Security verification (no hardcoded API keys or local paths)
-- Complete API documentation with KDoc comments
 
 ### Dependencies
 - `org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3`
 - `com.squareup.okhttp3:okhttp:4.12.0`
 - `com.google.code.gson:gson:2.10.1`
 
-### Testing
-- ConfigurationTest - 15 tests
-- StorageTest - 10 tests
-- SessionManagerTest - 10 tests
-- UserManagerTest - 13 tests
-- EventTest - 9 tests
-- EventQueueTest - 12 tests
-- RespectlyticsTest - 21 tests
-- IntegrationTest - 6 tests
-- **Total: 96 tests passing**
-
-[Unreleased]: https://github.com/respectlytics/respectlytics-kotlin/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/respectlytics/respectlytics-kotlin/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/respectlytics/respectlytics-kotlin/compare/v1.0.0...v2.0.0
 [1.0.0]: https://github.com/respectlytics/respectlytics-kotlin/releases/tag/v1.0.0

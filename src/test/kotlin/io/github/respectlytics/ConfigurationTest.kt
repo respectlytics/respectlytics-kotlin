@@ -22,7 +22,7 @@ class ConfigurationTest {
         assertEquals(30_000, config.readTimeout)
         assertEquals(30_000, config.writeTimeout)
         assertEquals(7 * 24 * 60 * 60 * 1000L, config.eventTTL)
-        assertEquals(30 * 60 * 1000, config.sessionTimeout)
+        assertEquals(2 * 60 * 60 * 1000L, config.sessionDuration) // v2.0.0: 2 hours default
     }
     
     @Test
@@ -39,7 +39,7 @@ class ConfigurationTest {
             readTimeout = 60_000,
             writeTimeout = 60_000,
             eventTTL = 14 * 24 * 60 * 60 * 1000L,
-            sessionTimeout = 60 * 60 * 1000
+            sessionDuration = 4 * 60 * 60 * 1000L // 4 hours
         )
         
         assertEquals("custom-key", config.apiKey)
@@ -53,7 +53,7 @@ class ConfigurationTest {
         assertEquals(60_000, config.readTimeout)
         assertEquals(60_000, config.writeTimeout)
         assertEquals(14 * 24 * 60 * 60 * 1000L, config.eventTTL)
-        assertEquals(60 * 60 * 1000, config.sessionTimeout)
+        assertEquals(4 * 60 * 60 * 1000L, config.sessionDuration)
     }
     
     @Test
@@ -141,9 +141,16 @@ class ConfigurationTest {
     }
     
     @Test
-    fun `test negative session timeout throws exception`() {
+    fun `test negative session duration throws exception`() {
         assertFailsWith<IllegalArgumentException> {
-            Configuration(apiKey = "test-key", sessionTimeout = -1)
+            Configuration(apiKey = "test-key", sessionDuration = -1)
+        }
+    }
+    
+    @Test
+    fun `test zero session duration throws exception`() {
+        assertFailsWith<IllegalArgumentException> {
+            Configuration(apiKey = "test-key", sessionDuration = 0)
         }
     }
 }

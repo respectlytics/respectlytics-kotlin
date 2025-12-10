@@ -9,14 +9,14 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 /**
- * Integration tests for Respectlytics Kotlin SDK
+ * Integration tests for Respectlytics Kotlin SDK v2.0.0
  * 
  * These tests verify the SDK works correctly with the actual Django API.
  * 
  * Prerequisites:
- * 1. Start Django development server on port 8000:
+ * 1. Start Django development server:
  *    cd /Users/sinecan/Developer/WebApps/respectlytics
- *    python manage.py runserver 8000
+ *    gunicorn core.wsgi:application --workers 1 --threads 3 --bind 0.0.0.0:8080
  * 
  * 2. Set RESPECTLYTICS_TEST_API_KEY environment variable:
  *    export RESPECTLYTICS_TEST_API_KEY=your-api-key
@@ -25,7 +25,7 @@ import java.util.*
  *    ./gradlew test --tests IntegrationTest
  */
 class IntegrationTest {
-    private val baseUrl = "http://127.0.0.1:8000/api/v1"
+    private val baseUrl = "http://127.0.0.1:8080/api/v1"
     private val testApiKey = System.getenv("RESPECTLYTICS_TEST_API_KEY") ?: ""
     private val client = OkHttpClient()
     private val mediaType = "application/json".toMediaType()
@@ -52,10 +52,10 @@ class IntegrationTest {
     
     @Test
     fun `test 1 - valid event submission returns 201`() {
-        println("🧪 Test 1: Valid event submission...")
+        println("🧪 Test 1: Valid event submission (v2.0.0 - no user_id)...")
         
         if (!serverRunning) {
-            println("  ⚠️  SKIPPED: Django server not running on port 8000")
+            println("  ⚠️  SKIPPED: Django server not running on port 8080")
             return
         }
         
@@ -64,15 +64,14 @@ class IntegrationTest {
             return
         }
         
+        // v2.0.0: No user_id field - session-based only
         val event = mapOf(
             "event_name" to "integration_test_event",
             "timestamp" to dateFormat.format(Date()),
             "session_id" to "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4",
             "platform" to "kotlin",
-            "os_version" to "1.9.22",
-            "app_version" to "1.0.0",
-            "locale" to "en_US",
-            "device_type" to "jvm"
+            "app_version" to "2.0.0",
+            "locale" to "en_US"
         )
         
         val response = sendEvent(event)
@@ -87,11 +86,11 @@ class IntegrationTest {
     }
     
     @Test
-    fun `test 2 - event with user_id returns 201`() {
-        println("🧪 Test 2: Event with user_id...")
+    fun `test 2 - session-based event without user_id returns 201`() {
+        println("🧪 Test 2: Session-based event (v2.0.0 architecture)...")
         
         if (!serverRunning) {
-            println("  ⚠️  SKIPPED: Django server not running on port 8000")
+            println("  ⚠️  SKIPPED: Django server not running on port 8080")
             return
         }
         
@@ -100,22 +99,20 @@ class IntegrationTest {
             return
         }
         
+        // v2.0.0: Session-based only - no user_id
         val event = mapOf(
-            "event_name" to "user_event_test",
+            "event_name" to "session_analytics_test",
             "timestamp" to dateFormat.format(Date()),
             "session_id" to "b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5",
-            "user_id" to "c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6",
             "platform" to "kotlin",
-            "os_version" to "1.9.22",
             "app_version" to "2.0.0",
-            "locale" to "de_DE",
-            "device_type" to "jvm"
+            "locale" to "de_DE"
         )
         
         val response = sendEvent(event)
         
         if (response.code == 201) {
-            println("  ✅ PASSED: Event with user_id created")
+            println("  ✅ PASSED: Session-based event created")
         } else {
             println("  ❌ FAILED: Expected 201, got ${response.code}")
             println("     Response: ${response.body?.string()}")
@@ -128,7 +125,7 @@ class IntegrationTest {
         println("🧪 Test 3: Event with screen parameter...")
         
         if (!serverRunning) {
-            println("  ⚠️  SKIPPED: Django server not running on port 8000")
+            println("  ⚠️  SKIPPED: Django server not running on port 8080")
             return
         }
         
@@ -143,10 +140,8 @@ class IntegrationTest {
             "session_id" to "d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1",
             "screen" to "HomeScreen",
             "platform" to "kotlin",
-            "os_version" to "1.9.22",
-            "app_version" to "1.0.0",
-            "locale" to "en_US",
-            "device_type" to "jvm"
+            "app_version" to "2.0.0",
+            "locale" to "en_US"
         )
         
         val response = sendEvent(event)
@@ -165,7 +160,7 @@ class IntegrationTest {
         println("🧪 Test 4: Missing API key...")
         
         if (!serverRunning) {
-            println("  ⚠️  SKIPPED: Django server not running on port 8000")
+            println("  ⚠️  SKIPPED: Django server not running on port 8080")
             return
         }
         
@@ -174,10 +169,8 @@ class IntegrationTest {
             "timestamp" to dateFormat.format(Date()),
             "session_id" to "e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
             "platform" to "kotlin",
-            "os_version" to "1.9.22",
-            "app_version" to "1.0.0",
-            "locale" to "en_US",
-            "device_type" to "jvm"
+            "app_version" to "2.0.0",
+            "locale" to "en_US"
         )
         
         val response = sendEvent(event, useApiKey = false)
@@ -196,7 +189,7 @@ class IntegrationTest {
         println("🧪 Test 5: Invalid API key...")
         
         if (!serverRunning) {
-            println("  ⚠️  SKIPPED: Django server not running on port 8000")
+            println("  ⚠️  SKIPPED: Django server not running on port 8080")
             return
         }
         
@@ -205,10 +198,8 @@ class IntegrationTest {
             "timestamp" to dateFormat.format(Date()),
             "session_id" to "f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3",
             "platform" to "kotlin",
-            "os_version" to "1.9.22",
-            "app_version" to "1.0.0",
-            "locale" to "en_US",
-            "device_type" to "jvm"
+            "app_version" to "2.0.0",
+            "locale" to "en_US"
         )
         
         val response = sendEvent(event, apiKey = "invalid-key-12345")
@@ -227,7 +218,7 @@ class IntegrationTest {
         println("🧪 Test 6: Empty event_name...")
         
         if (!serverRunning) {
-            println("  ⚠️  SKIPPED: Django server not running on port 8000")
+            println("  ⚠️  SKIPPED: Django server not running on port 8080")
             return
         }
         
@@ -241,10 +232,8 @@ class IntegrationTest {
             "timestamp" to dateFormat.format(Date()),
             "session_id" to "a2b3c4d5e6f7a2b3c4d5e6f7a2b3c4d5",
             "platform" to "kotlin",
-            "os_version" to "1.9.22",
-            "app_version" to "1.0.0",
-            "locale" to "en_US",
-            "device_type" to "jvm"
+            "app_version" to "2.0.0",
+            "locale" to "en_US"
         )
         
         val response = sendEvent(event)

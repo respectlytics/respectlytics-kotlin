@@ -3,66 +3,72 @@ package io.github.respectlytics
 import java.security.SecureRandom
 
 /**
- * Manages session IDs with automatic rotation after timeout.
+ * Manages session IDs with automatic 2-hour rotation.
  * 
- * Session IDs are 32-character hexadecimal strings generated using SecureRandom.
- * Sessions automatically rotate after the configured timeout period.
+ * v2.0.0 Privacy-First Architecture:
+ * - RAM-only storage - session IDs never written to disk
+ * - 2-hour automatic rotation
+ * - New session on every app launch
+ * - No persistent identifiers
+ * 
+ * This design ensures compliance with ePrivacy Directive Article 5(3)
+ * by avoiding device storage entirely.
  */
 internal class SessionManager(
-    private val storage: Storage,
-    private val sessionTimeout: Long
+    private val sessionDuration: Long = TWO_HOURS_MS
 ) {
     companion object {
-        private const val SESSION_ID_KEY = "respectlytics_session_id"
-        private const val SESSION_START_KEY = "respectlytics_session_start"
+        internal const val TWO_HOURS_MS = 2 * 60 * 60 * 1000L // 2 hours in milliseconds
     }
     
-    private var currentSessionId: String? = null
-    private var sessionStartTime: Long = 0
+    // RAM-only - never persisted to disk
+    private var currentSessionId: String
+    private var sessionStartTime: Long
+    
+    init {
+        // Generate session immediately at initialization
+        currentSessionId = generateSessionId()
+        sessionStartTime = System.currentTimeMillis()
+    }
     
     /**
-     * Get the current session ID, generating a new one if needed.
-     * Sessions automatically rotate after the timeout period.
+     * Get the current session ID.
+     * 
+     * Automatically rotates the session if 2 hours have elapsed.
+     * Session IDs are RAM-only and reset on every app launch.
      */
     @Synchronized
     fun getSessionId(): String {
         val now = System.currentTimeMillis()
         
-        // Try to restore from storage if we don't have one in memory
-        if (currentSessionId == null) {
-            currentSessionId = storage.getString(SESSION_ID_KEY)
-            storage.getString(SESSION_START_KEY)?.toLongOrNull()?.let {
-                sessionStartTime = it
-            }
-        }
-        
-        // Check if session expired
-        if (currentSessionId != null && (now - sessionStartTime) > sessionTimeout) {
-            currentSessionId = null
-        }
-        
-        // Generate new session if needed
-        if (currentSessionId == null) {
+        // Check if session expired (2-hour rotation)
+        if ((now - sessionStartTime) >= sessionDuration) {
             currentSessionId = generateSessionId()
             sessionStartTime = now
-            
-            // Persist to storage
-            storage.setString(SESSION_ID_KEY, currentSessionId!!)
-            storage.setString(SESSION_START_KEY, sessionStartTime.toString())
         }
         
-        return currentSessionId!!
+        return currentSessionId
     }
     
     /**
-     * Reset the session, forcing a new session ID on next access.
+     * Force a new session to be generated.
+     * This is useful for testing purposes.
      */
     @Synchronized
-    fun reset() {
-        currentSessionId = null
-        sessionStartTime = 0
-        storage.remove(SESSION_ID_KEY)
-        storage.remove(SESSION_START_KEY)
+    internal fun forceNewSession() {
+        currentSessionId = generateSessionId()
+        sessionStartTime = System.currentTimeMillis()
+    }
+    
+    /**
+     * Get the time remaining until the current session expires.
+     * Returns 0 if the session has already expired.
+     */
+    @Synchronized
+    internal fun getTimeRemainingMs(): Long {
+        val elapsed = System.currentTimeMillis() - sessionStartTime
+        val remaining = sessionDuration - elapsed
+        return if (remaining > 0) remaining else 0
     }
     
     /**

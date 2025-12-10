@@ -1,42 +1,53 @@
 # Respectlytics Kotlin SDK
 
-Official Respectlytics SDK for Kotlin/JVM and Android. Privacy-first analytics with automatic session management, offline support, and zero device identifier collection.
+Official Respectlytics SDK for Kotlin/JVM and Android. Privacy-first, session-based analytics with zero persistent device identifiers.
 
+[![Version](https://img.shields.io/badge/version-2.0.0-purple.svg)](https://github.com/respectlytics/respectlytics-kotlin/releases/tag/2.0.0)
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.8+-purple.svg)](https://kotlinlang.org)
 [![Platform](https://img.shields.io/badge/platform-JVM%20%7C%20Android%207%2B-lightgrey.svg)](https://kotlinlang.org)
 [![License](https://img.shields.io/badge/license-Proprietary-blue.svg)](LICENSE)
+
+## 🛡️ Privacy by Design
+
+Your privacy is our priority. Our mobile analytics solution is meticulously designed to provide valuable insights without compromising your data. We achieve this by collecting only session-based data, using anonymized identifiers that are stored only in your device's memory and renewed every two hours or upon app restart. IP addresses are processed transiently for approximate geolocation (country and region) only and are never stored. This privacy-by-design approach ensures that no personal data is retained, making our solution **designed to comply with GDPR and the ePrivacy Directive, potentially enabling analytics without user consent** in many jurisdictions.
+
+## What's New in v2.0.0
+
+⚠️ **Breaking Changes:**
+- Removed `identify()` method
+- Removed `reset()` method
+- Sessions now use RAM-only storage (2-hour rotation)
+
+✅ **Benefits:**
+- No device storage = no ePrivacy consent required
+- Automatic session management
+- Simpler API surface
 
 ## Installation
 
 ### Gradle (Kotlin DSL)
 
-Add to your `build.gradle.kts`:
-
 ```kotlin
 dependencies {
-    implementation("io.github.respectlytics:respectlytics-kotlin:1.0.0")
+    implementation("io.github.respectlytics:respectlytics-kotlin:2.0.0")
 }
 ```
 
 ### Gradle (Groovy)
 
-Add to your `build.gradle`:
-
 ```groovy
 dependencies {
-    implementation 'io.github.respectlytics:respectlytics-kotlin:1.0.0'
+    implementation 'io.github.respectlytics:respectlytics-kotlin:2.0.0'
 }
 ```
 
 ### Maven
 
-Add to your `pom.xml`:
-
 ```xml
 <dependency>
     <groupId>io.github.respectlytics</groupId>
     <artifactId>respectlytics-kotlin</artifactId>
-    <version>1.0.0</version>
+    <version>2.0.0</version>
 </dependency>
 ```
 
@@ -49,15 +60,12 @@ import io.github.respectlytics.Configuration
 // 1. Configure at app launch
 Respectlytics.configure(Configuration(apiKey = "your-api-key"))
 
-// 2. Enable cross-session user tracking (optional)
-Respectlytics.identify()
-
-// 3. Track events
+// 2. Track events - that's it!
 Respectlytics.track("purchase")
 Respectlytics.track("view_product", mapOf("screen" to "ProductDetail"))
 ```
 
-That's it! The SDK handles batching, offline queue, session management, and automatic retries.
+The SDK handles batching, offline queue, session management, and automatic retries automatically.
 
 ## API Reference
 
@@ -69,7 +77,7 @@ Initialize the SDK with your configuration. Call once at application startup.
 // Minimal configuration
 Respectlytics.configure(Configuration(apiKey = "your-api-key"))
 
-// Custom configuration
+// Full configuration options
 Respectlytics.configure(Configuration(
     apiKey = "your-api-key",
     baseUrl = "https://respectlytics.com/api/v1",  // Default
@@ -82,11 +90,11 @@ Respectlytics.configure(Configuration(
     readTimeout = 30_000L,        // Read timeout (default: 30000ms)
     writeTimeout = 30_000L,       // Write timeout (default: 30000ms)
     eventTTL = 7 * 24 * 60 * 60 * 1000L,  // 7 days (default)
-    sessionTimeout = 30 * 60 * 1000L      // 30 minutes (default)
+    sessionDuration = 2 * 60 * 60 * 1000L // 2 hours (default)
 ))
 ```
 
-### `track(eventName: String, properties: Map<String, String>? = null)`
+### `track(eventName: String, properties: Map<String, Any>? = null)`
 
 Track an event with optional properties.
 
@@ -101,82 +109,83 @@ Respectlytics.track("checkout_started", mapOf("screen" to "CartScreen"))
 
 **Automatic metadata collected:**
 - `timestamp` - ISO 8601 format
-- `session_id` - Auto-generated, rotates after 30 min inactivity
+- `session_id` - RAM-only, rotates every 2 hours
 - `platform` - "kotlin"
-- `os_version` - Kotlin version
-- `app_version` - "1.0.0" (default, can be customized in Configuration)
+- `app_version` - From configuration
 - `locale` - e.g., "en_US"
-- `device_type` - "jvm" (or "phone"/"tablet" on Android)
-
-### `identify(userId: String? = null)`
-
-Enable cross-session user tracking. If no userId is provided, generates and persists a random user ID.
-
-```kotlin
-// Auto-generate random user ID
-Respectlytics.identify()
-
-// Or provide custom user ID (32 hex chars)
-Respectlytics.identify("a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4")
-```
-
-**Privacy notes:**
-- User IDs can be auto-generated (random UUIDs) or custom
-- Stored in memory (JVM) or SharedPreferences (Android)
-- Cleared on app uninstall (Android)
-
-### `reset()`
-
-Clear the user ID. Call when the user logs out.
-
-```kotlin
-Respectlytics.reset()
-```
-
-After reset, subsequent events will be anonymous until `identify()` is called again.
 
 ### `flush()`
 
 Force send all queued events immediately. Rarely needed - the SDK auto-flushes every 30 seconds or when the queue reaches 10 events.
 
 ```kotlin
+// Call before app termination if needed
 Respectlytics.flush()
 ```
 
+## Session Management
+
+v2.0.0 uses RAM-only sessions for privacy:
+
+| Behavior | Description |
+|----------|-------------|
+| **New session on launch** | Fresh session ID every time the app starts |
+| **2-hour rotation** | Session ID automatically rotates after 2 hours |
+| **RAM-only storage** | Session IDs never written to disk |
+| **No cross-session tracking** | Users cannot be tracked across app launches |
+
 ## Automatic Behaviors
 
-The SDK handles these automatically - no developer action needed:
+The SDK handles these automatically:
 
 | Feature | Behavior |
 |---------|----------|
-| **Session Management** | New session ID generated on first event, rotates after 30 min inactivity |
+| **Session Management** | New session on app launch, rotates every 2 hours |
 | **Event Batching** | Events queued and sent in batches (max 10 events or 30 seconds) |
 | **Offline Support** | Events queued when offline, sent when connectivity returns |
 | **Retry Logic** | Failed requests retry with exponential backoff (max 3 attempts) |
-| **Queue Persistence** | Events saved to storage immediately, survive app restarts |
+| **Queue Persistence** | Events saved to storage, survive app restarts |
 | **Resource Protection** | Max queue size (100), event TTL (7 days), max retries (10) |
 
-## Privacy by Design
+## Privacy Compliance
 
-| What we DON'T collect | Why |
-|----------------------|-----|
-| IDFA / GAID | Device advertising IDs can track users across apps |
-| Device fingerprints | Can be used to identify users without consent |
-| IP addresses | Used only for geolocation lookup, then discarded |
-| Custom properties | Only `screen` allowed - prevents accidental PII collection |
+### What We DON'T Collect
 
-| What we DO collect | Purpose |
-|-------------------|---------|
-| Event names | To track which features are used |
-| Screen names | To understand user navigation flow |
-| Session IDs | To group events into usage sessions |
-| User IDs (opt-in) | To track returning users across sessions |
-| Platform metadata | To segment analytics by device type |
+| Data Type | Why Not |
+|-----------|---------|
+| IDFA / GAID | Device advertising IDs track users across apps |
+| Device fingerprints | Can identify users without consent |
+| Persistent user IDs | Enables cross-session tracking |
+| IP addresses | Used only transiently for geolocation, never stored |
 
-**GDPR Compliance:**
-- User IDs are opt-in via `identify()` - users are anonymous by default
-- No consent banner required (no personal data collected)
-- Users can be deleted from analytics (contact support)
+### What We DO Collect
+
+| Data Type | Purpose |
+|-----------|---------|
+| Event names | Track which features are used |
+| Screen names | Understand user navigation flow |
+| Session IDs | Group events into usage sessions (RAM-only) |
+| Platform metadata | Segment analytics by device type |
+| Country/Region | Approximate geolocation (from IP, IP not stored) |
+
+### Compliance Summary
+
+- **GDPR**: Designed for compliance - no personal data retained
+- **ePrivacy Directive**: No device storage = no consent banner required
+- **CCPA**: No personal information collected or sold
+
+## Migration from v1.x
+
+Simply remove any calls to `identify()` and `reset()`:
+
+```diff
+  Respectlytics.configure(Configuration(apiKey = "your-api-key"))
+- Respectlytics.identify("user-123")
+  Respectlytics.track("purchase")
+- Respectlytics.reset()
+```
+
+That's it! Session management is now fully automatic.
 
 ## Requirements
 
@@ -193,34 +202,17 @@ The SDK handles these automatically - no developer action needed:
 
 ### Unit Tests
 
-Run all unit tests:
-
 ```bash
 ./gradlew test
 ```
 
 ### Integration Tests
 
-Integration tests verify the SDK works with the actual Django API.
+Integration tests verify the SDK works with the actual API.
 
-**Prerequisites:**
-1. Start Django development server:
-   ```bash
-   cd /path/to/respectlytics
-   python manage.py runserver 8000
-   ```
-
-2. Set API key:
-   ```bash
-   export RESPECTLYTICS_TEST_API_KEY=your-api-key
-   ```
-
-3. Run integration tests:
-   ```bash
-   ./gradlew test --tests IntegrationTest
-   ```
-
-Integration tests will skip gracefully if the server is not running or API key is not set.
+1. Start the development server
+2. Set your API key: `export RESPECTLYTICS_TEST_API_KEY=your-api-key`
+3. Run: `./gradlew test --tests IntegrationTest`
 
 ## License
 
@@ -231,3 +223,4 @@ Proprietary. See [LICENSE](LICENSE) for details.
 - **Documentation:** https://respectlytics.com/sdk/
 - **API Reference:** https://respectlytics.com/api/v1/docs/
 - **Issues:** https://github.com/respectlytics/respectlytics-kotlin/issues
+- **Email:** respectlytics@loheden.com

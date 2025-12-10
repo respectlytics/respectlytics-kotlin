@@ -6,7 +6,8 @@ import com.google.gson.annotations.SerializedName
 /**
  * Represents an analytics event to be sent to the Respectlytics API.
  * 
- * Events are immutable and serialized to JSON for transmission.
+ * v2.0.0: Events are session-based only - no user_id field.
+ * This ensures privacy compliance by not tracking users across sessions.
  */
 data class Event(
     @SerializedName("event_name")
@@ -17,9 +18,6 @@ data class Event(
     
     @SerializedName("session_id")
     val sessionId: String,
-    
-    @SerializedName("user_id")
-    val userId: String,
     
     @SerializedName("timestamp")
     val timestamp: String,

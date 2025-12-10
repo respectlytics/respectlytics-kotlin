@@ -9,8 +9,7 @@ class SessionManagerTest {
     
     @Test
     fun `test session ID format is 32 hex characters`() {
-        val storage = Storage()
-        val sessionManager = SessionManager(storage, 30 * 60 * 1000)
+        val sessionManager = SessionManager()
         
         val sessionId = sessionManager.getSessionId()
         
@@ -20,9 +19,19 @@ class SessionManagerTest {
     }
     
     @Test
+    fun `test session ID is generated immediately at init`() {
+        val sessionManager = SessionManager()
+        
+        // Session should be available immediately after construction
+        val sessionId = sessionManager.getSessionId()
+        
+        assertTrue(sessionId.isNotEmpty(), "Session ID should be generated at init")
+        assertEquals(32, sessionId.length)
+    }
+    
+    @Test
     fun `test session ID persists across multiple calls`() {
-        val storage = Storage()
-        val sessionManager = SessionManager(storage, 30 * 60 * 1000)
+        val sessionManager = SessionManager()
         
         val firstId = sessionManager.getSessionId()
         val secondId = sessionManager.getSessionId()
@@ -33,84 +42,55 @@ class SessionManagerTest {
     }
     
     @Test
-    fun `test session rotation after timeout`() {
-        val storage = Storage()
-        val sessionManager = SessionManager(storage, 100) // 100ms timeout
+    fun `test session rotation after 2 hour duration`() {
+        val sessionManager = SessionManager(sessionDuration = 100) // 100ms for testing
         
         val firstId = sessionManager.getSessionId()
-        Thread.sleep(150) // Wait for timeout
+        Thread.sleep(150) // Wait for expiration
         val secondId = sessionManager.getSessionId()
         
-        assertNotEquals(firstId, secondId, "Session should rotate after timeout")
+        assertNotEquals(firstId, secondId, "Session should rotate after duration expires")
     }
     
     @Test
-    fun `test session does not rotate before timeout`() {
-        val storage = Storage()
-        val sessionManager = SessionManager(storage, 1000) // 1 second timeout
+    fun `test session does not rotate before duration expires`() {
+        val sessionManager = SessionManager(sessionDuration = 1000) // 1 second
         
         val firstId = sessionManager.getSessionId()
-        Thread.sleep(500) // Wait half the timeout
+        Thread.sleep(500) // Wait half the duration
         val secondId = sessionManager.getSessionId()
         
-        assertEquals(firstId, secondId, "Session should not rotate before timeout")
+        assertEquals(firstId, secondId, "Session should not rotate before duration expires")
     }
     
     @Test
-    fun `test reset clears session`() {
-        val storage = Storage()
-        val sessionManager = SessionManager(storage, 30 * 60 * 1000)
+    fun `test forceNewSession generates new session`() {
+        val sessionManager = SessionManager()
         
         val firstId = sessionManager.getSessionId()
-        sessionManager.reset()
+        sessionManager.forceNewSession()
         val secondId = sessionManager.getSessionId()
         
-        assertNotEquals(firstId, secondId, "Reset should generate new session ID")
+        assertNotEquals(firstId, secondId, "forceNewSession should generate new session ID")
     }
     
     @Test
-    fun `test session persists to storage`() {
-        val storage = Storage()
-        val sessionManager1 = SessionManager(storage, 30 * 60 * 1000)
+    fun `test new instance generates new session (RAM-only)`() {
+        val sessionManager1 = SessionManager()
+        val sessionManager2 = SessionManager()
         
-        val originalId = sessionManager1.getSessionId()
+        val id1 = sessionManager1.getSessionId()
+        val id2 = sessionManager2.getSessionId()
         
-        // Create new manager with same storage (simulates app restart)
-        val sessionManager2 = SessionManager(storage, 30 * 60 * 1000)
-        val restoredId = sessionManager2.getSessionId()
-        
-        assertEquals(originalId, restoredId, "Session should persist across manager instances")
-    }
-    
-    @Test
-    fun `test expired session not restored from storage`() {
-        val storage = Storage()
-        val sessionManager1 = SessionManager(storage, 100) // 100ms timeout
-        
-        sessionManager1.getSessionId()
-        Thread.sleep(150) // Wait for timeout
-        
-        // Create new manager with same storage
-        val sessionManager2 = SessionManager(storage, 100)
-        val firstIdFromManager2 = sessionManager2.getSessionId()
-        
-        // Get another ID to ensure it rotated
-        Thread.sleep(150)
-        val secondIdFromManager2 = sessionManager2.getSessionId()
-        
-        assertNotEquals(firstIdFromManager2, secondIdFromManager2, 
-            "Expired session should not be restored")
+        // Different instances should have different sessions (no persistence)
+        assertNotEquals(id1, id2, "Different instances should have different sessions")
     }
     
     @Test
     fun `test multiple sessions are unique`() {
-        val storage1 = Storage()
-        val storage2 = Storage()
-        val storage3 = Storage()
-        
-        val sessionManager1 = SessionManager(storage1, 30 * 60 * 1000)
-        val sessionManager2 = SessionManager(storage2, 30 * 60 * 1000)
-        val sessionManager3 = SessionManager(storage3, 30 * 60 * 1000)
+        val sessionManager1 = SessionManager()
+        val sessionManager2 = SessionManager()
+        val sessionManager3 = SessionManager()
         
         val id1 = sessionManager1.getSessionId()
         val id2 = sessionManager2.getSessionId()
@@ -122,27 +102,41 @@ class SessionManagerTest {
     }
     
     @Test
-    fun `test session timeout with long duration`() {
-        val storage = Storage()
-        val sessionManager = SessionManager(storage, 30 * 60 * 1000) // 30 minutes
+    fun `test session with long duration does not expire quickly`() {
+        val sessionManager = SessionManager(sessionDuration = 2 * 60 * 60 * 1000) // 2 hours
         
         val id = sessionManager.getSessionId()
         Thread.sleep(50) // Small delay
         val sameId = sessionManager.getSessionId()
         
-        assertEquals(id, sameId, "Session should not expire with long timeout")
+        assertEquals(id, sameId, "Session should not expire with long duration")
     }
     
     @Test
-    fun `test reset removes session from storage`() {
-        val storage = Storage()
-        val sessionManager = SessionManager(storage, 30 * 60 * 1000)
+    fun `test getTimeRemainingMs returns positive value`() {
+        val sessionManager = SessionManager(sessionDuration = 1000)
         
-        sessionManager.getSessionId()
-        sessionManager.reset()
+        sessionManager.getSessionId() // Ensure session is active
+        val remaining = sessionManager.getTimeRemainingMs()
         
-        // Verify storage is cleared
-        assertEquals(null, storage.getString("respectlytics_session_id"))
-        assertEquals(null, storage.getString("respectlytics_session_start"))
+        assertTrue(remaining > 0, "Time remaining should be positive for active session")
+        assertTrue(remaining <= 1000, "Time remaining should not exceed session duration")
+    }
+    
+    @Test
+    fun `test getTimeRemainingMs returns zero for expired session`() {
+        val sessionManager = SessionManager(sessionDuration = 50)
+        
+        sessionManager.getSessionId() // Ensure session is active
+        Thread.sleep(100) // Wait for expiration
+        val remaining = sessionManager.getTimeRemainingMs()
+        
+        assertEquals(0, remaining, "Time remaining should be zero for expired session")
+    }
+    
+    @Test
+    fun `test default session duration is 2 hours`() {
+        // Verify the default constant
+        assertEquals(2 * 60 * 60 * 1000L, SessionManager.TWO_HOURS_MS)
     }
 }

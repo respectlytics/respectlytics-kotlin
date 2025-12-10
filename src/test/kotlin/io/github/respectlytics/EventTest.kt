@@ -4,6 +4,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.test.assertNull
+import kotlin.test.assertFalse
 
 class EventTest {
     
@@ -12,13 +13,11 @@ class EventTest {
         val event = Event(
             eventName = "test_event",
             sessionId = "session123",
-            userId = "user456",
             timestamp = "2025-12-06T10:00:00Z"
         )
         
         assertEquals("test_event", event.eventName)
         assertEquals("session123", event.sessionId)
-        assertEquals("user456", event.userId)
         assertEquals("2025-12-06T10:00:00Z", event.timestamp)
         assertEquals("kotlin", event.platform)
         assertNull(event.properties)
@@ -33,7 +32,6 @@ class EventTest {
             eventName = "full_event",
             properties = properties,
             sessionId = "session789",
-            userId = "user101",
             timestamp = "2025-12-06T10:00:00Z",
             platform = "android",
             appVersion = "1.2.3",
@@ -43,7 +41,6 @@ class EventTest {
         assertEquals("full_event", event.eventName)
         assertEquals(properties, event.properties)
         assertEquals("session789", event.sessionId)
-        assertEquals("user101", event.userId)
         assertEquals("2025-12-06T10:00:00Z", event.timestamp)
         assertEquals("android", event.platform)
         assertEquals("1.2.3", event.appVersion)
@@ -51,11 +48,25 @@ class EventTest {
     }
     
     @Test
+    fun `test event has no user_id field`() {
+        // v2.0.0: Events are session-based only - no user_id
+        val event = Event(
+            eventName = "session_event",
+            sessionId = "sess1",
+            timestamp = "2025-12-06T10:00:00Z"
+        )
+        
+        val json = event.toJson()
+        
+        // Verify user_id is NOT present in serialized JSON
+        assertFalse(json.contains("user_id"), "Event should not contain user_id field")
+    }
+    
+    @Test
     fun `test event JSON serialization`() {
         val event = Event(
             eventName = "json_test",
             sessionId = "sess1",
-            userId = "user1",
             timestamp = "2025-12-06T10:00:00Z"
         )
         
@@ -63,9 +74,9 @@ class EventTest {
         
         assertTrue(json.contains("\"event_name\":\"json_test\""))
         assertTrue(json.contains("\"session_id\":\"sess1\""))
-        assertTrue(json.contains("\"user_id\":\"user1\""))
         assertTrue(json.contains("\"timestamp\":\"2025-12-06T10:00:00Z\""))
         assertTrue(json.contains("\"platform\":\"kotlin\""))
+        assertFalse(json.contains("\"user_id\""), "Should not contain user_id")
     }
     
     @Test
@@ -75,7 +86,6 @@ class EventTest {
             eventName = "props_test",
             properties = properties,
             sessionId = "sess2",
-            userId = "user2",
             timestamp = "2025-12-06T10:00:00Z"
         )
         
@@ -93,7 +103,6 @@ class EventTest {
             {
                 "event_name": "deserialized_event",
                 "session_id": "sess3",
-                "user_id": "user3",
                 "timestamp": "2025-12-06T10:00:00Z",
                 "platform": "kotlin"
             }
@@ -102,14 +111,12 @@ class EventTest {
         val originalEvent = Event(
             eventName = "temp",
             sessionId = "temp",
-            userId = "temp",
             timestamp = "temp"
         )
         val event = originalEvent.fromJson(json)
         
         assertEquals("deserialized_event", event.eventName)
         assertEquals("sess3", event.sessionId)
-        assertEquals("user3", event.userId)
         assertEquals("2025-12-06T10:00:00Z", event.timestamp)
         assertEquals("kotlin", event.platform)
     }
@@ -120,7 +127,6 @@ class EventTest {
             eventName = "roundtrip_test",
             properties = mapOf("key" to "value"),
             sessionId = "sess4",
-            userId = "user4",
             timestamp = "2025-12-06T10:00:00Z",
             appVersion = "2.0.0",
             locale = "fr_FR"
@@ -131,7 +137,6 @@ class EventTest {
         
         assertEquals(original.eventName, deserialized.eventName)
         assertEquals(original.sessionId, deserialized.sessionId)
-        assertEquals(original.userId, deserialized.userId)
         assertEquals(original.timestamp, deserialized.timestamp)
         assertEquals(original.platform, deserialized.platform)
         assertEquals(original.appVersion, deserialized.appVersion)
@@ -144,7 +149,6 @@ class EventTest {
             eventName = "empty_props",
             properties = emptyMap(),
             sessionId = "sess5",
-            userId = "user5",
             timestamp = "2025-12-06T10:00:00Z"
         )
         
@@ -157,7 +161,6 @@ class EventTest {
         val event = Event(
             eventName = "event_with_symbols_!@#$%",
             sessionId = "sess6",
-            userId = "user6",
             timestamp = "2025-12-06T10:00:00Z"
         )
         
@@ -170,7 +173,6 @@ class EventTest {
         val event1 = Event(
             eventName = "immutable",
             sessionId = "sess7",
-            userId = "user7",
             timestamp = "2025-12-06T10:00:00Z"
         )
         
