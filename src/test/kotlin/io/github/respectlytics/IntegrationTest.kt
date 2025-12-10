@@ -15,7 +15,7 @@ import java.util.*
  * 
  * Prerequisites:
  * 1. Start Django development server:
- *    cd /Users/sinecan/Developer/WebApps/respectlytics
+ *    cd path/to/respectlytics
  *    gunicorn core.wsgi:application --workers 1 --threads 3 --bind 0.0.0.0:8080
  * 
  * 2. Set RESPECTLYTICS_TEST_API_KEY environment variable:
