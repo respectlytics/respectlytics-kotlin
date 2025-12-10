@@ -1,12 +1,60 @@
+# ===========================================
+# Respectlytics Kotlin SDK
+# ===========================================
+
+# ------------------------------------------
+# macOS
+# ------------------------------------------
+.DS_Store
+._*
+
+# ------------------------------------------
+# Gradle
+# ------------------------------------------
 .gradle/
+.gradle-dist/
 build/
-.env.testing
-.env
+out/
+
+# ------------------------------------------
+# IntelliJ / Android Studio
+# ------------------------------------------
 *.iml
 .idea/
 local.properties
-.DS_Store
-out/
+
+# ------------------------------------------
+# Compiled files
+# ------------------------------------------
 *.jar
 *.class
-.gradle-dist/
+
+# ------------------------------------------
+# Secrets & Environment Variables (SECURITY CRITICAL)
+# ------------------------------------------
+.env
+.env.*
+!.env.testing.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.keystore
+*.jks
+**/credentials.json
+**/secrets.json
+**/google-services.json
+secrets/
+.secrets/
+signing.properties
+keystore.properties
+
+# ------------------------------------------
+# Logs
+# ------------------------------------------
+*.log
+
+# ------------------------------------------
+# Security Tools
+# ------------------------------------------
+.gitleaks.toml
