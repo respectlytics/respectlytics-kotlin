@@ -2,6 +2,7 @@ plugins {
     kotlin("jvm") version "1.9.22"
     id("maven-publish")
     id("signing")
+    id("io.github.gradle-nexus.publish-plugin") version "1.3.0"
 }
 
 group = "io.github.respectlytics"
@@ -43,7 +44,7 @@ publishing {
         create<MavenPublication>("maven") {
             groupId = "io.github.respectlytics"
             artifactId = "respectlytics-kotlin"
-            version = "2.0.0"
+            version = project.version.toString()
 
             from(components["java"])
 
@@ -75,15 +76,15 @@ publishing {
             }
         }
     }
+}
 
+nexusPublishing {
     repositories {
-        maven {
-            name = "OSSRH"
-            url = uri("https://ossrh-staging-api.central.sonatype.com/service/local/staging/deploy/maven2/")
-            credentials {
-                username = project.findProperty("ossrhUsername") as String? ?: ""
-                password = project.findProperty("ossrhPassword") as String? ?: ""
-            }
+        sonatype {
+            nexusUrl.set(uri("https://ossrh-staging-api.central.sonatype.com/service/local/"))
+            snapshotRepositoryUrl.set(uri("https://ossrh-staging-api.central.sonatype.com/content/repositories/snapshots/"))
+            username.set(project.findProperty("ossrhUsername") as String? ?: System.getenv("OSSRH_USERNAME") ?: "")
+            password.set(project.findProperty("ossrhPassword") as String? ?: System.getenv("OSSRH_PASSWORD") ?: "")
         }
     }
 }
