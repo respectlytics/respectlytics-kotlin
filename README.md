@@ -9,7 +9,9 @@ Official Respectlytics SDK for Kotlin/JVM and Android. Privacy-first, session-ba
 
 ## 🛡️ Privacy by Design
 
-Your privacy is our priority. Our mobile analytics solution is meticulously designed to provide valuable insights without compromising your data. We achieve this by collecting only session-based data, using anonymized identifiers that are stored only in your device's memory and renewed every two hours or upon app restart. IP addresses are processed transiently for approximate geolocation (country and region) only and are never stored. This privacy-by-design approach ensures that no personal data is retained, making our solution **designed to comply with GDPR and the ePrivacy Directive, potentially enabling analytics without user consent** in many jurisdictions.
+Respectlytics is designed to minimize data collection by default. We use anonymized identifiers that are stored only in device memory (RAM) and rotate automatically every two hours or upon app restart. IP addresses are processed transiently for approximate region lookup and immediately discarded—no personal data is ever persisted server-side.
+
+This privacy-by-design architecture avoids persistent device storage and cross-session tracking, significantly reducing compliance complexity compared to traditional analytics. While this approach may reduce or eliminate consent requirements in some jurisdictions, regulations and their interpretation vary. We recommend consulting with your legal team to determine your specific compliance requirements.
 
 ## What's New in v2.0.0
 
