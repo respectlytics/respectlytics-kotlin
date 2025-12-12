@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "io.github.respectlytics"
-version = "2.0.0"
+version = "2.0.1"
 
 repositories {
     mavenCentral()
@@ -17,7 +17,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.google.code.gson:gson:2.10.1")
-    
+
     // Testing
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.mockito.kotlin:mockito-kotlin:5.1.0")
@@ -44,21 +44,21 @@ publishing {
             groupId = "io.github.respectlytics"
             artifactId = "respectlytics-kotlin"
             version = "2.0.0"
-            
+
             from(components["java"])
-            
+
             pom {
                 name.set("Respectlytics Kotlin SDK")
                 description.set("Privacy-first analytics SDK for Android/Kotlin")
                 url.set("https://github.com/respectlytics/respectlytics-kotlin")
-                
+
                 licenses {
                     license {
                         name.set("Proprietary")
                         url.set("https://github.com/respectlytics/respectlytics-kotlin/blob/main/LICENSE")
                     }
                 }
-                
+
                 developers {
                     developer {
                         id.set("respectlytics")
@@ -66,7 +66,7 @@ publishing {
                         email.set("respectlytics@loheden.com")
                     }
                 }
-                
+
                 scm {
                     connection.set("scm:git:git://github.com/respectlytics/respectlytics-kotlin.git")
                     developerConnection.set("scm:git:ssh://github.com:respectlytics/respectlytics-kotlin.git")
@@ -75,7 +75,7 @@ publishing {
             }
         }
     }
-    
+
     repositories {
         maven {
             name = "OSSRH"

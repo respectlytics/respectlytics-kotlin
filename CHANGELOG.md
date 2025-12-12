@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.1] - 2025-12-12
+
+### Changed
+- Updated privacy compliance wording in documentation to clarify regulatory requirements and recommend legal consultation
+
 ## [2.0.0] - 2025-12-10
 
 ### ⚠️ Breaking Changes
@@ -28,50 +33,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - `SessionManager` now initializes session immediately at construction
 - `SessionManager` no longer uses Storage for persistence
-- Configuration parameter renamed: `sessionTimeout` → `sessionDuration`
-- SDK log message now shows version: "v2.0.0 - Session-based analytics"
 
-### Privacy Improvements
-- No persistent identifiers stored on device
-- Designed for GDPR/ePrivacy Directive compliance
-- No consent banner required (no device storage)
-- Cannot track users across app launches by design
+### Why This Change?
+Storing identifiers on device requires user consent under ePrivacy Directive Article 5(3).
+In-memory sessions require no consent, making Respectlytics designed for consent-free analytics.
 
-### Migration Guide
-Remove calls to `identify()` and `reset()` - they no longer exist:
-```diff
-  Respectlytics.configure(Configuration(apiKey = "your-api-key"))
-- Respectlytics.identify("user-123")
-  Respectlytics.track("purchase")
-- Respectlytics.reset()
-```
+### Migration
+Remove any calls to `identify()` and `reset()`. Session management is now automatic.
 
-## [1.0.0] - 2025-12-06
+## [1.0.1] - 2025-11-30
+
+### Fixed
+- Minor bug fixes and stability improvements
+
+## [1.0.0] - 2025-11-15
 
 ### Added
-- Initial release of Respectlytics Kotlin SDK
-- Event tracking with `track(eventName, properties)`
-- User identification with `identify(userId)` - auto-generates UUID if no ID provided
-- Session management with 30-minute timeout rotation
-- User management with persistent storage
-- Event queue with immediate persistence to storage
-- Automatic event batching (max 10 events or 30 seconds)
-- Network client with retry logic and exponential backoff (max 3 attempts per call)
-- Resource protection:
-  - Max queue size enforcement (100 events, drops oldest)
-  - Event TTL enforcement (7 days, auto-discard old events)
-  - Max retry limits (10 attempts per event across flushes)
-- Comprehensive configuration with 11 customizable parameters
-- Thread-safe operations using synchronized methods
-- Automatic metadata collection (timestamp, session_id, platform, os_version, app_version, locale, device_type)
-- Privacy by design - no device identifiers, no IP logging, minimal data collection
-- JVM and Android compatibility (API 24+)
-
-### Dependencies
-- `org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3`
-- `com.squareup.okhttp3:okhttp:4.12.0`
-- `com.google.code.gson:gson:2.10.1`
-
-[Unreleased]: https://github.com/respectlytics/respectlytics-kotlin/compare/v2.0.0...HEAD
-[2.0.0]: https://github.com/respectlytics/respectlytics-kotlin/compare/v1.0.0...v2.0.0
-[1.0.0]: https://github.com/respectlytics/respectlytics-kotlin/releases/tag/v1.0.0
+- Initial release
+- Privacy-first analytics with session-based tracking
+- Automatic session management
+- Event batching and offline support
