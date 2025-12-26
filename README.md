@@ -2,28 +2,29 @@
 
 Official Respectlytics SDK for Kotlin/JVM and Android. Privacy-first, session-based analytics with zero persistent device identifiers.
 
-[![Version](https://img.shields.io/badge/version-2.0.0-purple.svg)](https://github.com/respectlytics/respectlytics-kotlin/releases/tag/2.0.0)
+[![Version](https://img.shields.io/badge/version-2.1.0-purple.svg)](https://github.com/respectlytics/respectlytics-kotlin/releases/tag/2.1.0)
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.8+-purple.svg)](https://kotlinlang.org)
 [![Platform](https://img.shields.io/badge/platform-JVM%20%7C%20Android%207%2B-lightgrey.svg)](https://kotlinlang.org)
 [![License](https://img.shields.io/badge/license-Proprietary-blue.svg)](LICENSE)
 
-## 🛡️ Privacy by Design
+## Philosophy: Return of Avoidance (ROA)
 
-Respectlytics is designed to minimize data collection by default. We use anonymized identifiers that are stored only in device memory (RAM) and rotate automatically every two hours or upon app restart. IP addresses are processed transiently for approximate region lookup and immediately discarded—no personal data is ever persisted server-side.
+Respectlytics helps developers avoid collecting personal data in the first place. We believe the best way to handle sensitive data is to never collect it.
 
-This privacy-by-design architecture avoids persistent device storage and cross-session tracking, significantly reducing compliance complexity compared to traditional analytics. While this approach may reduce or eliminate consent requirements in some jurisdictions, regulations and their interpretation vary. We recommend consulting with your legal team to determine your specific compliance requirements.
+Our SDK collects only 4 fields:
+- `event_name` - What happened
+- `timestamp` - When it happened
+- `session_id` - Groups events in a session (RAM-only, auto-rotates)
+- `platform` - "kotlin" or "android"
 
-## What's New in v2.0.0
+That's it. No device identifiers, no fingerprinting, no persistent tracking.
+
+## What's New in v2.1.0
 
 ⚠️ **Breaking Changes:**
-- Removed `identify()` method
-- Removed `reset()` method
-- Sessions now use RAM-only storage (2-hour rotation)
-
-✅ **Benefits:**
-- No device storage = no ePrivacy consent required
-- Automatic session management
-- Simpler API surface
+- Removed `properties` parameter from `track()` method
+- SDK now sends only 4 fields to the API
+- Deprecated fields (`app_version`, `locale`) are no longer collected
 
 ## Installation
 
@@ -31,7 +32,7 @@ This privacy-by-design architecture avoids persistent device storage and cross-s
 
 ```kotlin
 dependencies {
-    implementation("io.github.respectlytics:respectlytics-kotlin:2.0.0")
+    implementation("io.github.respectlytics:respectlytics-kotlin:2.1.0")
 }
 ```
 
@@ -39,7 +40,7 @@ dependencies {
 
 ```groovy
 dependencies {
-    implementation 'io.github.respectlytics:respectlytics-kotlin:2.0.0'
+    implementation 'io.github.respectlytics:respectlytics-kotlin:2.1.0'
 }
 ```
 
@@ -49,7 +50,7 @@ dependencies {
 <dependency>
     <groupId>io.github.respectlytics</groupId>
     <artifactId>respectlytics-kotlin</artifactId>
-    <version>2.0.0</version>
+    <version>2.1.0</version>
 </dependency>
 ```
 
@@ -64,7 +65,7 @@ Respectlytics.configure(Configuration(apiKey = "your-api-key"))
 
 // 2. Track events - that's it!
 Respectlytics.track("purchase")
-Respectlytics.track("view_product", mapOf("screen" to "ProductDetail"))
+Respectlytics.track("view_product")
 ```
 
 The SDK handles batching, offline queue, session management, and automatic retries automatically.
@@ -96,38 +97,36 @@ Respectlytics.configure(Configuration(
 ))
 ```
 
-### `track(eventName: String, properties: Map<String, Any>? = null)`
+### `track(eventName: String)`
 
-Track an event with optional properties.
+Track an event.
 
 ```kotlin
-// Simple event
+Respectlytics.track("purchase")
 Respectlytics.track("button_clicked")
-
-// Event with screen context
-Respectlytics.track("add_to_cart", mapOf("screen" to "ProductDetail"))
-Respectlytics.track("checkout_started", mapOf("screen" to "CartScreen"))
 ```
-
-**Automatic metadata collected:**
-- `timestamp` - ISO 8601 format
-- `session_id` - RAM-only, rotates every 2 hours
-- `platform` - "kotlin"
-- `app_version` - From configuration
-- `locale` - e.g., "en_US"
 
 ### `flush()`
 
-Force send all queued events immediately. Rarely needed - the SDK auto-flushes every 30 seconds or when the queue reaches 10 events.
+Force send all queued events immediately. Rarely needed - the SDK auto-flushes.
 
 ```kotlin
-// Call before app termination if needed
 Respectlytics.flush()
 ```
 
-## Session Management
+### `isConfigured(): Boolean`
 
-v2.0.0 uses RAM-only sessions for privacy:
+Check if the SDK has been configured.
+
+```kotlin
+if (Respectlytics.isConfigured()) {
+    Respectlytics.track("app_launched")
+}
+```
+
+## 🔄 Automatic Session Management
+
+v2.1.0 uses RAM-only sessions for privacy:
 
 | Behavior | Description |
 |----------|-------------|
@@ -149,7 +148,14 @@ The SDK handles these automatically:
 | **Queue Persistence** | Events saved to storage, survive app restarts |
 | **Resource Protection** | Max queue size (100), event TTL (7 days), max retries (10) |
 
-## Privacy Compliance
+## Privacy Architecture
+
+Respectlytics uses anonymized identifiers stored only in device memory (RAM) that rotate automatically every two hours or upon app restart. IP addresses are processed transiently for approximate country lookup and immediately discarded—no personal data is ever persisted.
+
+Our system is:
+- **Transparent** - Clear about what data is collected
+- **Defensible** - Minimal data surface by design
+- **Clear** - Explicit reasoning for each field
 
 ### What We DON'T Collect
 
@@ -159,35 +165,32 @@ The SDK handles these automatically:
 | Device fingerprints | Can identify users without consent |
 | Persistent user IDs | Enables cross-session tracking |
 | IP addresses | Used only transiently for geolocation, never stored |
+| Custom properties | Prevents accidental PII collection |
 
 ### What We DO Collect
 
 | Data Type | Purpose |
 |-----------|---------|
-| Event names | Track which features are used |
-| Screen names | Understand user navigation flow |
-| Session IDs | Group events into usage sessions (RAM-only) |
-| Platform metadata | Segment analytics by device type |
-| Country/Region | Approximate geolocation (from IP, IP not stored) |
+| Event name | Track which features are used |
+| Timestamp | When the event occurred |
+| Session ID | Group events in a session (RAM-only) |
+| Platform | Segment analytics by platform |
 
-### Compliance Summary
+### Server-Side Only
 
-- **GDPR**: Designed for compliance - no personal data retained
-- **ePrivacy Directive**: No device storage = no consent banner required
-- **CCPA**: No personal information collected or sold
+Country is derived server-side from IP addresses, then IP is immediately discarded.
 
-## Migration from v1.x
+## Migration from v2.0.x
 
-Simply remove any calls to `identify()` and `reset()`:
+Remove any `properties` parameter from `track()` calls:
 
 ```diff
   Respectlytics.configure(Configuration(apiKey = "your-api-key"))
-- Respectlytics.identify("user-123")
-  Respectlytics.track("purchase")
-- Respectlytics.reset()
+- Respectlytics.track("purchase", mapOf("screen" to "checkout"))
++ Respectlytics.track("purchase")
 ```
 
-That's it! Session management is now fully automatic.
+That's it!
 
 ## Requirements
 
@@ -215,6 +218,10 @@ Integration tests verify the SDK works with the actual API.
 1. Start the development server
 2. Set your API key: `export RESPECTLYTICS_TEST_API_KEY=your-api-key`
 3. Run: `./gradlew test --tests IntegrationTest`
+
+## Legal Note
+
+Respectlytics provides a technical solution focused on privacy. Regulations vary by jurisdiction. Consult your legal team to determine your specific requirements.
 
 ## License
 

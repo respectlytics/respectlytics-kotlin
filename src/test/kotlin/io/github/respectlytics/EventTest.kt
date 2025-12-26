@@ -3,181 +3,138 @@ package io.github.respectlytics
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
-import kotlin.test.assertNull
 import kotlin.test.assertFalse
 
 class EventTest {
-    
+
     @Test
     fun `test event creation with required fields`() {
         val event = Event(
             eventName = "test_event",
-            sessionId = "session123",
-            timestamp = "2025-12-06T10:00:00Z"
-        )
-        
-        assertEquals("test_event", event.eventName)
-        assertEquals("session123", event.sessionId)
-        assertEquals("2025-12-06T10:00:00Z", event.timestamp)
-        assertEquals("kotlin", event.platform)
-        assertNull(event.properties)
-        assertNull(event.appVersion)
-        assertNull(event.locale)
-    }
-    
-    @Test
-    fun `test event creation with all fields`() {
-        val properties = mapOf("key1" to "value1", "key2" to 123)
-        val event = Event(
-            eventName = "full_event",
-            properties = properties,
-            sessionId = "session789",
             timestamp = "2025-12-06T10:00:00Z",
-            platform = "android",
-            appVersion = "1.2.3",
-            locale = "en_US"
+            sessionId = "session123"
         )
-        
-        assertEquals("full_event", event.eventName)
-        assertEquals(properties, event.properties)
+
+        assertEquals("test_event", event.eventName)
+        assertEquals("2025-12-06T10:00:00Z", event.timestamp)
+        assertEquals("session123", event.sessionId)
+        assertEquals("kotlin", event.platform)
+    }
+
+    @Test
+    fun `test event creation with custom platform`() {
+        val event = Event(
+            eventName = "android_event",
+            timestamp = "2025-12-06T10:00:00Z",
+            sessionId = "session789",
+            platform = "android"
+        )
+
+        assertEquals("android_event", event.eventName)
         assertEquals("session789", event.sessionId)
         assertEquals("2025-12-06T10:00:00Z", event.timestamp)
         assertEquals("android", event.platform)
-        assertEquals("1.2.3", event.appVersion)
-        assertEquals("en_US", event.locale)
     }
-    
+
     @Test
-    fun `test event has no user_id field`() {
-        // v2.0.0: Events are session-based only - no user_id
+    fun `test event only has 4 fields in JSON`() {
         val event = Event(
-            eventName = "session_event",
-            sessionId = "sess1",
-            timestamp = "2025-12-06T10:00:00Z"
+            eventName = "minimal_event",
+            timestamp = "2025-12-06T10:00:00Z",
+            sessionId = "sess1"
         )
-        
+
         val json = event.toJson()
-        
-        // Verify user_id is NOT present in serialized JSON
-        assertFalse(json.contains("user_id"), "Event should not contain user_id field")
+
+        // v2.1.0: Only 4 fields should be present
+        assertTrue(json.contains("\"event_name\":"), "Should contain event_name")
+        assertTrue(json.contains("\"timestamp\":"), "Should contain timestamp")
+        assertTrue(json.contains("\"session_id\":"), "Should contain session_id")
+        assertTrue(json.contains("\"platform\":"), "Should contain platform")
+
+        // Verify deprecated fields are NOT present
+        assertFalse(json.contains("user_id"), "Should not contain user_id")
+        assertFalse(json.contains("properties"), "Should not contain properties")
+        assertFalse(json.contains("app_version"), "Should not contain app_version")
+        assertFalse(json.contains("locale"), "Should not contain locale")
+        assertFalse(json.contains("screen"), "Should not contain screen")
     }
-    
+
     @Test
     fun `test event JSON serialization`() {
         val event = Event(
             eventName = "json_test",
-            sessionId = "sess1",
-            timestamp = "2025-12-06T10:00:00Z"
+            timestamp = "2025-12-06T10:00:00Z",
+            sessionId = "sess1"
         )
-        
+
         val json = event.toJson()
-        
+
         assertTrue(json.contains("\"event_name\":\"json_test\""))
         assertTrue(json.contains("\"session_id\":\"sess1\""))
         assertTrue(json.contains("\"timestamp\":\"2025-12-06T10:00:00Z\""))
         assertTrue(json.contains("\"platform\":\"kotlin\""))
-        assertFalse(json.contains("\"user_id\""), "Should not contain user_id")
     }
-    
-    @Test
-    fun `test event JSON serialization with properties`() {
-        val properties = mapOf("color" to "blue", "count" to 42)
-        val event = Event(
-            eventName = "props_test",
-            properties = properties,
-            sessionId = "sess2",
-            timestamp = "2025-12-06T10:00:00Z"
-        )
-        
-        val json = event.toJson()
-        
-        assertTrue(json.contains("\"properties\""))
-        assertTrue(json.contains("\"color\""))
-        assertTrue(json.contains("\"blue\""))
-        assertTrue(json.contains("\"count\""))
-    }
-    
+
     @Test
     fun `test event JSON deserialization`() {
         val json = """
             {
                 "event_name": "deserialized_event",
-                "session_id": "sess3",
                 "timestamp": "2025-12-06T10:00:00Z",
+                "session_id": "sess3",
                 "platform": "kotlin"
             }
         """.trimIndent()
-        
-        val originalEvent = Event(
-            eventName = "temp",
-            sessionId = "temp",
-            timestamp = "temp"
-        )
-        val event = originalEvent.fromJson(json)
-        
+
+        val event = Event.fromJson(json)
+
         assertEquals("deserialized_event", event.eventName)
-        assertEquals("sess3", event.sessionId)
         assertEquals("2025-12-06T10:00:00Z", event.timestamp)
+        assertEquals("sess3", event.sessionId)
         assertEquals("kotlin", event.platform)
     }
-    
+
     @Test
     fun `test event serialization roundtrip`() {
         val original = Event(
             eventName = "roundtrip_test",
-            properties = mapOf("key" to "value"),
-            sessionId = "sess4",
             timestamp = "2025-12-06T10:00:00Z",
-            appVersion = "2.0.0",
-            locale = "fr_FR"
+            sessionId = "sess4",
+            platform = "android"
         )
-        
+
         val json = original.toJson()
-        val deserialized = original.fromJson(json)
-        
+        val deserialized = Event.fromJson(json)
+
         assertEquals(original.eventName, deserialized.eventName)
-        assertEquals(original.sessionId, deserialized.sessionId)
         assertEquals(original.timestamp, deserialized.timestamp)
+        assertEquals(original.sessionId, deserialized.sessionId)
         assertEquals(original.platform, deserialized.platform)
-        assertEquals(original.appVersion, deserialized.appVersion)
-        assertEquals(original.locale, deserialized.locale)
     }
-    
-    @Test
-    fun `test event with empty properties map`() {
-        val event = Event(
-            eventName = "empty_props",
-            properties = emptyMap(),
-            sessionId = "sess5",
-            timestamp = "2025-12-06T10:00:00Z"
-        )
-        
-        val json = event.toJson()
-        assertTrue(json.contains("\"properties\":{}"))
-    }
-    
+
     @Test
     fun `test event with special characters in name`() {
         val event = Event(
-            eventName = "event_with_symbols_!@#$%",
-            sessionId = "sess6",
-            timestamp = "2025-12-06T10:00:00Z"
+            eventName = "event_with_symbols_!@#",
+            timestamp = "2025-12-06T10:00:00Z",
+            sessionId = "sess6"
         )
-        
+
         val json = event.toJson()
-        assertTrue(json.contains("event_with_symbols_!@#$%"))
+        assertTrue(json.contains("event_with_symbols_!@#"))
     }
-    
+
     @Test
     fun `test event immutability`() {
         val event1 = Event(
             eventName = "immutable",
-            sessionId = "sess7",
-            timestamp = "2025-12-06T10:00:00Z"
+            timestamp = "2025-12-06T10:00:00Z",
+            sessionId = "sess7"
         )
-        
+
         val event2 = event1.copy(eventName = "modified")
-        
+
         assertEquals("immutable", event1.eventName)
         assertEquals("modified", event2.eventName)
         assertEquals(event1.sessionId, event2.sessionId)
