@@ -2,22 +2,28 @@
 
 Official Respectlytics SDK for Kotlin/JVM and Android. Privacy-first, session-based analytics with zero persistent device identifiers.
 
-[![Version](https://img.shields.io/badge/version-2.1.0-purple.svg)](https://github.com/respectlytics/respectlytics-kotlin/releases/tag/2.1.0)
+[![Version](https://img.shields.io/badge/version-2.2.0-purple.svg)](https://github.com/respectlytics/respectlytics-kotlin/releases/tag/2.2.0)
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.8+-purple.svg)](https://kotlinlang.org)
 [![Platform](https://img.shields.io/badge/platform-JVM%20%7C%20Android%207%2B-lightgrey.svg)](https://kotlinlang.org)
-[![License](https://img.shields.io/badge/license-Proprietary-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 ## Philosophy: Return of Avoidance (ROA)
 
 Respectlytics helps developers avoid collecting personal data in the first place. We believe the best way to handle sensitive data is to never collect it.
 
-Our SDK collects only 4 fields:
+Our SDK collects only 4 fields (a 5th, `country`, is derived server-side):
 - `event_name` - What happened
 - `timestamp` - When it happened
 - `session_id` - Groups events in a session (RAM-only, auto-rotates)
 - `platform` - "kotlin" or "android"
 
 That's it. No device identifiers, no fingerprinting, no persistent tracking.
+
+## What's New in v2.2.0
+
+- **License changed to MIT** — SDKs are now fully open source
+- **Self-hosted server support** — documented `baseURL` configuration for self-hosted instances
+- **Privacy wording improvements** — removed regulatory compliance claims from code comments
 
 ## What's New in v2.1.0
 
@@ -32,7 +38,7 @@ That's it. No device identifiers, no fingerprinting, no persistent tracking.
 
 ```kotlin
 dependencies {
-    implementation("io.github.respectlytics:respectlytics-kotlin:2.1.0")
+    implementation("io.github.respectlytics:respectlytics-kotlin:2.2.0")
 }
 ```
 
@@ -40,7 +46,7 @@ dependencies {
 
 ```groovy
 dependencies {
-    implementation 'io.github.respectlytics:respectlytics-kotlin:2.1.0'
+    implementation 'io.github.respectlytics:respectlytics-kotlin:2.2.0'
 }
 ```
 
@@ -50,7 +56,7 @@ dependencies {
 <dependency>
     <groupId>io.github.respectlytics</groupId>
     <artifactId>respectlytics-kotlin</artifactId>
-    <version>2.1.0</version>
+    <version>2.2.0</version>
 </dependency>
 ```
 
@@ -70,6 +76,19 @@ Respectlytics.track("view_product")
 
 The SDK handles batching, offline queue, session management, and automatic retries automatically.
 
+## Self-Hosted Server
+
+If you're running the [Respectlytics Community Edition](https://github.com/respectlytics/respectlytics) on your own server, configure the SDK to point to your instance:
+
+```kotlin
+Respectlytics.configure(Configuration(
+    apiKey = "your-app-key",
+    baseURL = "https://your-server.com/api/v1"
+))
+```
+
+The `baseURL` defaults to `https://respectlytics.com/api/v1` (the managed cloud service). Replace it with your self-hosted server's URL.
+
 ## API Reference
 
 ### `configure(config: Configuration)`
@@ -83,7 +102,7 @@ Respectlytics.configure(Configuration(apiKey = "your-api-key"))
 // Full configuration options
 Respectlytics.configure(Configuration(
     apiKey = "your-api-key",
-    baseUrl = "https://respectlytics.com/api/v1",  // Default
+    baseURL = "https://respectlytics.com/api/v1",  // Default
     maxQueueSize = 100,           // Max events in memory (default: 100)
     flushInterval = 30_000L,      // Flush every 30 seconds (default: 30000ms)
     maxBatchSize = 10,            // Events per batch (default: 10)
@@ -225,7 +244,7 @@ Respectlytics provides a technical solution focused on privacy. Regulations vary
 
 ## License
 
-Proprietary. See [LICENSE](LICENSE) for details.
+MIT License. See [LICENSE](LICENSE) for details.
 
 ## Support
 

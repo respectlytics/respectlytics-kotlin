@@ -6,7 +6,7 @@ plugins {
 }
 
 group = "io.github.respectlytics"
-version = "2.1.0"
+version = "2.2.0"
 
 repositories {
     mavenCentral()
@@ -55,8 +55,8 @@ publishing {
 
                 licenses {
                     license {
-                        name.set("Proprietary")
-                        url.set("https://github.com/respectlytics/respectlytics-kotlin/blob/main/LICENSE")
+                        name.set("MIT License")
+                        url.set("https://opensource.org/licenses/MIT")
                     }
                 }
 
