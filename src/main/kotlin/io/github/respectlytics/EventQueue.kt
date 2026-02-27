@@ -1,7 +1,5 @@
 package io.github.respectlytics
 
-import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
@@ -9,27 +7,24 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 /**
- * Queue for managing and batching analytics events with comprehensive retry and resource management.
- * 
+ * RAM-only queue for managing and batching analytics events.
+ *
+ * v3.0.0: All data is held exclusively in memory. Nothing is written to disk.
+ * Unsent events are lost on process termination — this is a deliberate
+ * privacy-first design choice (zero device storage for analytics).
+ *
  * Features:
  * - Automatic flush when queue reaches maxBatchSize
  * - Periodic auto-flush based on flushInterval
  * - Max queue size enforcement (drops oldest events)
  * - Event TTL (discards expired events)
  * - Per-event retry tracking (gives up after maxEventRetries)
- * - Persistence across app restarts
  * - Thread-safe operations
  */
 internal class EventQueue(
-    private val storage: Storage,
     private val networkClient: NetworkClient,
     private val configuration: Configuration
 ) {
-    companion object {
-        private const val QUEUE_KEY = "respectlytics_event_queue"
-        private const val RETRY_COUNT_KEY = "respectlytics_retry_count"
-    }
-    
     private val queue = ConcurrentLinkedQueue<Event>()
     private val eventRetryCount = ConcurrentHashMap<String, Int>()
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
@@ -39,8 +34,6 @@ internal class EventQueue(
     }
     
     init {
-        loadQueue()
-        loadRetryCount()
         startAutoFlush()
     }
     
@@ -67,8 +60,6 @@ internal class EventQueue(
         // Auto-flush if batch size reached
         if (queue.size >= configuration.maxBatchSize) {
             scope.launch { flush() }
-        } else {
-            saveQueue()
         }
     }
     
@@ -108,13 +99,7 @@ internal class EventQueue(
             }
         }
         
-        if (freshEvents.isEmpty()) {
-            synchronized(this) {
-                saveQueue()
-                saveRetryCount()
-            }
-            return
-        }
+        if (freshEvents.isEmpty()) return
         
         // Filter out events that exceeded retry limit
         val retryableEvents = freshEvents.filter { event ->
@@ -128,13 +113,7 @@ internal class EventQueue(
             }
         }
         
-        if (retryableEvents.isEmpty()) {
-            synchronized(this) {
-                saveQueue()
-                saveRetryCount()
-            }
-            return
-        }
+        if (retryableEvents.isEmpty()) return
         
         // Attempt to send events
         try {
@@ -154,8 +133,6 @@ internal class EventQueue(
                         queue.offer(event)
                     }
                 }
-                saveQueue()
-                saveRetryCount()
             }
         } catch (e: Exception) {
             // Network error - increment retry counts and re-queue
@@ -165,8 +142,6 @@ internal class EventQueue(
                     eventRetryCount[event.timestamp] = currentRetries + 1
                     queue.offer(event)
                 }
-                saveQueue()
-                saveRetryCount()
             }
             throw e
         }
@@ -205,59 +180,6 @@ internal class EventQueue(
                     // Continue auto-flush even if one flush fails
                 }
             }
-        }
-    }
-    
-    /**
-     * Load queued events from storage.
-     */
-    private fun loadQueue() {
-        val json = storage.getString(QUEUE_KEY) ?: return
-        try {
-            val type = object : TypeToken<List<Event>>() {}.type
-            val events: List<Event> = Gson().fromJson(json, type)
-            events.forEach { queue.offer(it) }
-        } catch (e: Exception) {
-            println("Respectlytics: Failed to load queue: ${e.message}")
-        }
-    }
-    
-    /**
-     * Save current queue to storage.
-     */
-    private fun saveQueue() {
-        try {
-            val events = queue.toList()
-            val json = Gson().toJson(events)
-            storage.setString(QUEUE_KEY, json)
-        } catch (e: Exception) {
-            println("Respectlytics: Failed to save queue: ${e.message}")
-        }
-    }
-    
-    /**
-     * Load retry counts from storage.
-     */
-    private fun loadRetryCount() {
-        val json = storage.getString(RETRY_COUNT_KEY) ?: return
-        try {
-            val type = object : TypeToken<Map<String, Int>>() {}.type
-            val loaded: Map<String, Int> = Gson().fromJson(json, type)
-            eventRetryCount.putAll(loaded)
-        } catch (e: Exception) {
-            println("Respectlytics: Failed to load retry counts: ${e.message}")
-        }
-    }
-    
-    /**
-     * Save retry counts to storage.
-     */
-    private fun saveRetryCount() {
-        try {
-            val json = Gson().toJson(eventRetryCount)
-            storage.setString(RETRY_COUNT_KEY, json)
-        } catch (e: Exception) {
-            println("Respectlytics: Failed to save retry counts: ${e.message}")
         }
     }
     

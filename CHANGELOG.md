@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.0] - 2026-02-22
+
+### ⚠️ Breaking Changes
+- **RAM-only event queue** — Event queue is now held exclusively in memory. Unsent events are lost on process termination. This is a deliberate privacy-first design choice: zero bytes are written to the user's device for analytics.
+- **Removed `Storage` class** — The internal persistence abstraction (`Storage.kt`) has been deleted entirely.
+
+### Removed
+- `Storage.kt` — in-memory key-value store that was designed as a persistence abstraction
+- `loadQueue()`, `saveQueue()`, `loadRetryCount()`, `saveRetryCount()` methods from `EventQueue`
+- Gson dependency for queue serialization (Gson is still used for network JSON serialization in `Event.kt`)
+- `StorageTest.kt` — tests for the removed Storage class
+- `test queue persists to storage` test from EventQueueTest
+
+### Changed
+- `EventQueue` constructor no longer accepts a `Storage` parameter
+- `Respectlytics.configure()` no longer creates a `Storage` instance
+- `Respectlytics.resetForTesting()` no longer calls `storage.clear()`
+- Updated version strings to v3.0.0
+
+### Added
+- `test events are RAM-only and lost on new instance` test — verifies events don't survive across EventQueue instances
+
 ## [2.2.0] - 2026-02-15
 
 ### Changed

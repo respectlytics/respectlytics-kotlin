@@ -2,7 +2,7 @@
 
 Official Respectlytics SDK for Kotlin/JVM and Android. Privacy-first, session-based analytics with zero persistent device identifiers.
 
-[![Version](https://img.shields.io/badge/version-2.2.0-purple.svg)](https://github.com/respectlytics/respectlytics-kotlin/releases/tag/2.2.0)
+[![Version](https://img.shields.io/badge/version-3.0.0-purple.svg)](https://github.com/respectlytics/respectlytics-kotlin/releases/tag/v3.0.0)
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.8+-purple.svg)](https://kotlinlang.org)
 [![Platform](https://img.shields.io/badge/platform-JVM%20%7C%20Android%207%2B-lightgrey.svg)](https://kotlinlang.org)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -18,6 +18,13 @@ Our SDK collects only 4 fields (a 5th, `country`, is derived server-side):
 - `platform` - "kotlin" or "android"
 
 That's it. No device identifiers, no fingerprinting, no persistent tracking.
+
+## What's New in v3.0.0
+
+⚠️ **Breaking Changes:**
+- **RAM-only event queue** — Event queue is now held exclusively in memory. Unsent events are lost on process termination. This is a deliberate privacy-first design choice: zero bytes are written to the user's device for analytics.
+- **Removed `Storage` class** — The internal persistence abstraction has been deleted entirely.
+- **Gson no longer used for queue serialization** — Gson is still used for JSON serialization of events sent over the network, but no longer for persisting events to storage.
 
 ## What's New in v2.2.0
 
@@ -38,7 +45,7 @@ That's it. No device identifiers, no fingerprinting, no persistent tracking.
 
 ```kotlin
 dependencies {
-    implementation("io.github.respectlytics:respectlytics-kotlin:2.2.0")
+    implementation("io.github.respectlytics:respectlytics-kotlin:3.0.0")
 }
 ```
 
@@ -46,7 +53,7 @@ dependencies {
 
 ```groovy
 dependencies {
-    implementation 'io.github.respectlytics:respectlytics-kotlin:2.2.0'
+    implementation 'io.github.respectlytics:respectlytics-kotlin:3.0.0'
 }
 ```
 
@@ -56,7 +63,7 @@ dependencies {
 <dependency>
     <groupId>io.github.respectlytics</groupId>
     <artifactId>respectlytics-kotlin</artifactId>
-    <version>2.2.0</version>
+    <version>3.0.0</version>
 </dependency>
 ```
 
@@ -74,7 +81,7 @@ Respectlytics.track("purchase")
 Respectlytics.track("view_product")
 ```
 
-The SDK handles batching, offline queue, session management, and automatic retries automatically.
+The SDK handles batching, session management, and automatic retries automatically. Events are held in memory and flushed to the server periodically.
 
 ## Self-Hosted Server
 
@@ -145,7 +152,7 @@ if (Respectlytics.isConfigured()) {
 
 ## 🔄 Automatic Session Management
 
-v2.1.0 uses RAM-only sessions for privacy:
+RAM-only sessions for privacy:
 
 | Behavior | Description |
 |----------|-------------|
@@ -161,10 +168,9 @@ The SDK handles these automatically:
 | Feature | Behavior |
 |---------|----------|
 | **Session Management** | New session on app launch, rotates every 2 hours |
-| **Event Batching** | Events queued and sent in batches (max 10 events or 30 seconds) |
-| **Offline Support** | Events queued when offline, sent when connectivity returns |
+| **Event Batching** | Events queued in memory and sent in batches (max 10 events or 30 seconds) |
+| **RAM-only Event Queue** | Events held in memory only — lost on force-quit by design |
 | **Retry Logic** | Failed requests retry with exponential backoff (max 3 attempts) |
-| **Queue Persistence** | Events saved to storage, survive app restarts |
 | **Resource Protection** | Max queue size (100), event TTL (7 days), max retries (10) |
 
 ## Privacy Architecture
@@ -199,9 +205,11 @@ Our system is:
 
 Country is derived server-side from IP addresses, then IP is immediately discarded.
 
-## Migration from v2.0.x
+## Migration from v2.x
 
-Remove any `properties` parameter from `track()` calls:
+v3.0.0 requires no changes to your public API calls. The only difference is that the event queue is now RAM-only — unsent events are lost on process termination instead of being persisted to storage. This is a privacy improvement, not an API change.
+
+If you're migrating from v2.0.x, also remove any `properties` parameter from `track()` calls:
 
 ```diff
   Respectlytics.configure(Configuration(apiKey = "your-api-key"))

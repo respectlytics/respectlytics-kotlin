@@ -7,15 +7,16 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 /**
- * Respectlytics Analytics SDK v2.1.0 - Privacy-first analytics for JVM/Android
+ * Respectlytics Analytics SDK v3.0.0 - Privacy-first analytics for JVM/Android
  *
  * This is the main entry point for the Respectlytics SDK. All public API methods
  * are accessed through this singleton object.
  *
- * v2.1.0 Features:
+ * v3.0.0 Features:
  * - Strict 4-field events: event_name, timestamp, session_id, platform
  * - Session-based analytics only (no user tracking)
- * - RAM-only session storage (nothing written to disk)
+ * - RAM-only storage: sessions AND event queue held exclusively in memory
+ * - Zero device storage for analytics (nothing written to disk)
  * - 2-hour automatic session rotation
  * - New session on every app launch
  *
@@ -33,7 +34,6 @@ import java.util.*
  * ```
  */
 object Respectlytics {
-    private var storage: Storage? = null
     private var sessionManager: SessionManager? = null
     private var eventQueue: EventQueue? = null
     private var configuration: Configuration? = null
@@ -56,20 +56,19 @@ object Respectlytics {
     fun configure(config: Configuration) {
         configuration = config
 
-        // Initialize components
-        storage = Storage()
+        // Initialize components (all RAM-only, zero device storage)
         sessionManager = SessionManager(config.sessionDuration)
 
         val networkClient = OkHttpNetworkClient(config)
-        eventQueue = EventQueue(storage!!, networkClient, config)
+        eventQueue = EventQueue(networkClient, config)
 
-        log("✓ SDK configured successfully (v2.1.0 - 4-field events)")
+        log("✓ SDK configured successfully (v3.0.0 - RAM-only, 4-field events)")
     }
 
     /**
      * Track an analytics event.
      *
-     * v2.1.0: Only event_name is accepted. Properties parameter removed.
+     * Only event_name is accepted. Properties parameter removed in v2.1.0.
      *
      * @param eventName Name of the event (max 100 characters, required)
      * @throws IllegalStateException if SDK not configured
@@ -166,8 +165,6 @@ object Respectlytics {
      */
     @JvmStatic
     internal fun resetForTesting() {
-        storage?.clear()
-        storage = null
         sessionManager = null
         eventQueue = null
         configuration = null

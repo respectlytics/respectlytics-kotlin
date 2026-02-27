@@ -143,7 +143,7 @@ class RespectlyticsTest {
         val config = Configuration(apiKey = testApiKey)
         Respectlytics.configure(config)
 
-        // Track multiple events (v2-1-0: no properties parameter)
+        // Track multiple events (no properties parameter since v2.1.0)
         Respectlytics.track("event_1")
         Respectlytics.track("event_2")
         Respectlytics.track("event_3")
@@ -175,13 +175,12 @@ class RespectlyticsTest {
     }
 
     @Test
-    fun `test v2-1-0 track API takes only eventName`() {
-        // This test documents the v2-1-0 API surface
-        // track() now takes only eventName - no properties parameter
+    fun `test track API takes only eventName`() {
+        // track() takes only eventName - no properties parameter (since v2.1.0)
         val config = Configuration(apiKey = testApiKey)
         Respectlytics.configure(config)
 
-        // v2-1-0: Only eventName is accepted
+        // Only eventName is accepted
         Respectlytics.track("button_clicked")
         Respectlytics.track("purchase")
         Respectlytics.track("app_launched")

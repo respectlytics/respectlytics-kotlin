@@ -46,10 +46,9 @@ class EventQueueTest {
 
     @Test
     fun `test add event to queue`() {
-        val storage = Storage()
         val networkClient = MockNetworkClient()
         val config = createTestConfig()
-        val queue = EventQueue(storage, networkClient, config)
+        val queue = EventQueue(networkClient, config)
 
         queue.add(createTestEvent("event1"))
 
@@ -59,10 +58,9 @@ class EventQueueTest {
 
     @Test
     fun `test add multiple events to queue`() {
-        val storage = Storage()
         val networkClient = MockNetworkClient()
         val config = createTestConfig()
-        val queue = EventQueue(storage, networkClient, config)
+        val queue = EventQueue(networkClient, config)
 
         queue.add(createTestEvent("event1"))
         queue.add(createTestEvent("event2"))
@@ -74,10 +72,9 @@ class EventQueueTest {
 
     @Test
     fun `test flush sends events to network`() = runBlocking {
-        val storage = Storage()
         val networkClient = MockNetworkClient()
         val config = createTestConfig()
-        val queue = EventQueue(storage, networkClient, config)
+        val queue = EventQueue(networkClient, config)
 
         queue.add(createTestEvent("event1"))
         queue.add(createTestEvent("event2"))
@@ -92,10 +89,9 @@ class EventQueueTest {
 
     @Test
     fun `test auto-flush when queue reaches max batch size`() = runBlocking {
-        val storage = Storage()
         val networkClient = MockNetworkClient()
         val config = createTestConfig(maxBatchSize = 3)
-        val queue = EventQueue(storage, networkClient, config)
+        val queue = EventQueue(networkClient, config)
 
         queue.add(createTestEvent("event1"))
         queue.add(createTestEvent("event2"))
@@ -110,11 +106,10 @@ class EventQueueTest {
 
     @Test
     fun `test failed flush re-adds events to queue`() = runBlocking {
-        val storage = Storage()
         val networkClient = MockNetworkClient()
         networkClient.shouldFail = true
         val config = createTestConfig()
-        val queue = EventQueue(storage, networkClient, config)
+        val queue = EventQueue(networkClient, config)
 
         queue.add(createTestEvent("event1"))
         queue.add(createTestEvent("event2"))
@@ -131,40 +126,10 @@ class EventQueueTest {
     }
 
     @Test
-    fun `test queue persists to storage`() = runBlocking {
-        val storage = Storage()
-        val networkClient = MockNetworkClient()
-        networkClient.shouldFail = true // Prevent flush from succeeding
-        val config = createTestConfig()
-        val queue1 = EventQueue(storage, networkClient, config)
-
-        queue1.add(createTestEvent("event1"))
-        queue1.add(createTestEvent("event2"))
-
-        // Try to flush - will fail and re-queue events
-        try {
-            queue1.flush()
-        } catch (e: Exception) {
-            // Expected
-        }
-
-        queue1.shutdown()
-
-        // Create new queue with same storage (simulates app restart)
-        networkClient.shouldFail = false // Allow next queue to succeed
-        val queue2 = EventQueue(storage, networkClient, config)
-
-        // Should restore events from storage
-        assertTrue(queue2.size() >= 2, "Expected at least 2 events, got ${queue2.size()}")
-        queue2.shutdown()
-    }
-
-    @Test
     fun `test flush with empty queue does nothing`() = runBlocking {
-        val storage = Storage()
         val networkClient = MockNetworkClient()
         val config = createTestConfig()
-        val queue = EventQueue(storage, networkClient, config)
+        val queue = EventQueue(networkClient, config)
 
         queue.flush()
 
@@ -174,10 +139,9 @@ class EventQueueTest {
 
     @Test
     fun `test multiple flushes`() = runBlocking {
-        val storage = Storage()
         val networkClient = MockNetworkClient()
         val config = createTestConfig()
-        val queue = EventQueue(storage, networkClient, config)
+        val queue = EventQueue(networkClient, config)
 
         queue.add(createTestEvent("batch1-event1"))
         queue.flush()
@@ -195,10 +159,9 @@ class EventQueueTest {
 
     @Test
     fun `test periodic auto-flush`() = runBlocking {
-        val storage = Storage()
         val networkClient = MockNetworkClient()
         val config = createTestConfig(flushInterval = 200) // 200ms
-        val queue = EventQueue(storage, networkClient, config)
+        val queue = EventQueue(networkClient, config)
 
         queue.add(createTestEvent("event1"))
 
@@ -211,10 +174,9 @@ class EventQueueTest {
 
     @Test
     fun `test queue size accuracy`() {
-        val storage = Storage()
         val networkClient = MockNetworkClient()
         val config = createTestConfig()
-        val queue = EventQueue(storage, networkClient, config)
+        val queue = EventQueue(networkClient, config)
 
         assertEquals(0, queue.size())
 
@@ -228,10 +190,9 @@ class EventQueueTest {
 
     @Test
     fun `test shutdown flushes remaining events`() = runBlocking {
-        val storage = Storage()
         val networkClient = MockNetworkClient()
         val config = createTestConfig()
-        val queue = EventQueue(storage, networkClient, config)
+        val queue = EventQueue(networkClient, config)
 
         queue.add(createTestEvent("event1"))
         queue.add(createTestEvent("event2"))
@@ -244,10 +205,9 @@ class EventQueueTest {
 
     @Test
     fun `test events maintain order in queue`() = runBlocking {
-        val storage = Storage()
         val networkClient = MockNetworkClient()
         val config = createTestConfig()
-        val queue = EventQueue(storage, networkClient, config)
+        val queue = EventQueue(networkClient, config)
 
         queue.add(createTestEvent("first"))
         queue.add(createTestEvent("second"))
@@ -260,5 +220,31 @@ class EventQueueTest {
         assertEquals("second", sentEvents[1].eventName)
         assertEquals("third", sentEvents[2].eventName)
         queue.shutdown()
+    }
+
+    @Test
+    fun `test events are RAM-only and lost on new instance`() = runBlocking {
+        val networkClient = MockNetworkClient()
+        networkClient.shouldFail = true // Prevent flush from succeeding
+        val config = createTestConfig()
+        val queue1 = EventQueue(networkClient, config)
+
+        queue1.add(createTestEvent("event1"))
+        queue1.add(createTestEvent("event2"))
+
+        try {
+            queue1.flush()
+        } catch (e: Exception) {
+            // Expected
+        }
+
+        queue1.shutdown()
+
+        // Create new queue (simulates app restart) — events must be gone
+        networkClient.shouldFail = false
+        val queue2 = EventQueue(networkClient, config)
+
+        assertEquals(0, queue2.size(), "New queue instance should start empty (RAM-only)")
+        queue2.shutdown()
     }
 }
