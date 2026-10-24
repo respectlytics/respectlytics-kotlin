@@ -293,4 +293,36 @@ class EventQueueTest {
         assertTrue(queue.snapshot().single() === second)
         queue.shutdown()
     }
+
+    @Test
+    fun `test a refused app key drops the queue and stops it for good`() = runBlocking {
+        val networkClient = object : NetworkClient {
+            var calls = 0
+            override suspend fun sendEvents(events: List<Event>): List<Event> {
+                calls++
+                throw AppKeyRefusedException()
+            }
+        }
+        val queue = EventQueue(networkClient, createTestConfig())
+        val original = System.err
+        val captured = java.io.ByteArrayOutputStream()
+        System.setErr(java.io.PrintStream(captured, true, "UTF-8"))
+        try {
+            queue.add(createTestEvent("first"))
+            queue.add(createTestEvent("second"))
+            queue.flush() // not rethrown: the queue handles it
+
+            queue.add(createTestEvent("third"))
+            queue.flush()
+        } finally {
+            System.setErr(original)
+        }
+
+        assertTrue(queue.isAppKeyRefused)
+        assertEquals(1, networkClient.calls)
+        assertEquals(0, queue.size(), "queued events are dropped and new ones are not taken")
+        assertEquals(listOf(EventQueue.APP_KEY_REFUSED_MESSAGE), captured.toString("UTF-8").lines().filter { it.isNotBlank() })
+        queue.shutdown()
+        assertEquals(1, networkClient.calls, "shutdown sends nothing either")
+    }
 }

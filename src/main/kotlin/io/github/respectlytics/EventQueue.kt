@@ -3,6 +3,7 @@ package io.github.respectlytics
 import kotlinx.coroutines.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.atomic.AtomicBoolean
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -19,6 +20,7 @@ import java.util.*
  * - Max queue size enforcement (drops oldest events)
  * - Event TTL (discards expired events)
  * - Per-event retry tracking (gives up after maxEventRetries)
+ * - Stops for good when the server refuses the app key (401)
  * - Thread-safe operations
  */
 internal class EventQueue(
@@ -29,13 +31,27 @@ internal class EventQueue(
     private val eventRetryCount = ConcurrentHashMap<String, Int>()
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     private var flushJob: Job? = null
+    private val appKeyRefused = AtomicBoolean(false)
     private val dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply {
         timeZone = TimeZone.getTimeZone("UTC")
     }
     
+    companion object {
+        internal const val APP_KEY_REFUSED_MESSAGE =
+            "[Respectlytics] The app key was refused (401). Check it in your app's Settings on " +
+                "respectlytics.com. No events are sent until the app starts again."
+    }
+
     init {
         startAutoFlush()
     }
+
+    /**
+     * True once the server refused the app key (401). From then on this queue
+     * takes no events and sends nothing; configure() makes a new one.
+     */
+    val isAppKeyRefused: Boolean
+        get() = appKeyRefused.get()
     
     /**
      * Add an event to the queue.
@@ -44,6 +60,8 @@ internal class EventQueue(
      */
     @Synchronized
     fun add(event: Event) {
+        if (appKeyRefused.get()) return
+
         // Enforce max queue size - drop oldest events if needed
         if (queue.size >= configuration.maxQueueSize) {
             val dropCount = queue.size - configuration.maxQueueSize + 1
@@ -75,6 +93,8 @@ internal class EventQueue(
      *   sent again
      */
     suspend fun flush() {
+        if (appKeyRefused.get()) return
+
         val eventsToSend = mutableListOf<Event>()
         
         synchronized(this) {
@@ -130,15 +150,22 @@ internal class EventQueue(
                     eventRetryCount.remove(event.timestamp)
                 }
                 // Not delivered - increment retry counts and re-queue
-                failed.forEach { event ->
-                    val currentRetries = eventRetryCount.getOrDefault(event.timestamp, 0)
-                    eventRetryCount[event.timestamp] = currentRetries + 1
-                    queue.offer(event)
+                if (!appKeyRefused.get()) {
+                    failed.forEach { event ->
+                        val currentRetries = eventRetryCount.getOrDefault(event.timestamp, 0)
+                        eventRetryCount[event.timestamp] = currentRetries + 1
+                        queue.offer(event)
+                    }
                 }
             }
+        } catch (e: AppKeyRefusedException) {
+            // No retry can fix the key, and each refused request counts toward a
+            // block of the device's address: drop everything and stop
+            stopForRefusedKey()
         } catch (e: Exception) {
             // Network error - increment retry counts and re-queue
             synchronized(this) {
+                if (appKeyRefused.get()) return
                 retryableEvents.forEach { event ->
                     val currentRetries = eventRetryCount.getOrDefault(event.timestamp, 0)
                     eventRetryCount[event.timestamp] = currentRetries + 1
@@ -180,6 +207,19 @@ internal class EventQueue(
     fun shutdownWithoutFlush() {
         flushJob?.cancel()
         scope.cancel()
+    }
+
+    /**
+     * Drop the queued events, stop the auto-flush, and say so once.
+     */
+    private fun stopForRefusedKey() {
+        if (!appKeyRefused.compareAndSet(false, true)) return
+        synchronized(this) {
+            queue.clear()
+            eventRetryCount.clear()
+        }
+        flushJob?.cancel()
+        System.err.println(APP_KEY_REFUSED_MESSAGE)
     }
 
     /**

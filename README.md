@@ -221,6 +221,7 @@ The SDK handles these automatically:
 
 An event the server refuses as invalid (400) is dropped, so it never holds up the events after it.
 Once the server has confirmed an event, the SDK does not send it again.
+If the server refuses the app key (401), the SDK logs it once, drops the queued events and sends nothing more until the app starts again.
 
 ## Privacy Architecture
 

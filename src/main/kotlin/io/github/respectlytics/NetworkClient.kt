@@ -16,9 +16,17 @@ internal interface NetworkClient {
      * Send the events, in order.
      *
      * @return the events that were not delivered, in order (empty when every one was)
+     * @throws AppKeyRefusedException when the server refused the app key (401)
      */
     suspend fun sendEvents(events: List<Event>): List<Event>
 }
+
+/**
+ * The server refused the app key (401): it is wrong or revoked, and no retry can
+ * change that, while every refused request counts toward the server's block of
+ * the device's address. The queue stops sending for the rest of the app's run.
+ */
+internal class AppKeyRefusedException : Exception("The app key was refused (401)")
 
 /**
  * Real HTTP implementation using OkHttp3 with retry logic.
@@ -38,10 +46,13 @@ internal interface NetworkClient {
  * field. If the server refuses the event itself, it is dropped, so it never
  * holds up the events queued after it.
  *
- * Any other failure concerns the account or the connection (a wrong key, a plan
- * at its limit, the network down), so that event and the rest wait for the next
- * flush instead of each failing in turn. An event the server accepted is never
- * sent again.
+ * A 401 means the app key is wrong or revoked: nothing more is sent, and
+ * [AppKeyRefusedException] tells the queue to stop.
+ *
+ * Any other failure concerns the account or the connection (a plan at its
+ * limit, the network down), so that event and the rest wait for the next flush
+ * instead of each failing in turn. An event the server accepted is never sent
+ * again.
  */
 internal class OkHttpNetworkClient(
     private val configuration: Configuration,
@@ -57,7 +68,7 @@ internal class OkHttpNetworkClient(
     private val mediaType = "application/json; charset=utf-8".toMediaType()
 
     /** How one request ended, after its retries. */
-    private enum class Outcome { DELIVERED, BAD_REQUEST, FAILED }
+    private enum class Outcome { DELIVERED, BAD_REQUEST, KEY_REFUSED, FAILED }
 
     override suspend fun sendEvents(events: List<Event>): List<Event> {
         for ((index, event) in events.withIndex()) {
@@ -77,6 +88,7 @@ internal class OkHttpNetworkClient(
         when (sendWithRetry(event)) {
             Outcome.DELIVERED -> return true
             Outcome.FAILED -> return false
+            Outcome.KEY_REFUSED -> throw AppKeyRefusedException()
             Outcome.BAD_REQUEST -> Unit
         }
 
@@ -87,6 +99,7 @@ internal class OkHttpNetworkClient(
                     return true
                 }
                 Outcome.FAILED -> return false
+                Outcome.KEY_REFUSED -> throw AppKeyRefusedException()
                 Outcome.BAD_REQUEST -> Unit
             }
         }
@@ -111,6 +124,10 @@ internal class OkHttpNetworkClient(
 
                 if (lastStatusCode == 400) {
                     return Outcome.BAD_REQUEST
+                }
+
+                if (lastStatusCode == 401) {
+                    return Outcome.KEY_REFUSED
                 }
 
                 // Don't retry on client errors (4xx) except rate limiting (429)

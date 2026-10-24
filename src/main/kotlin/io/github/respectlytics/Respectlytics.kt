@@ -86,6 +86,9 @@ object Respectlytics {
      * or a Boolean, and at most the first 20 that pass are sent. A bad property never
      * stops the event; the log names what was dropped and why, never the value.
      *
+     * Once the server has refused the app key (401), calls are ignored until
+     * the app starts again or configure() is called again.
+     *
      * @param eventName Name of the event (max 100 characters, required)
      * @param properties Optional properties, such as `mapOf("paywall" to "b")` or
      *   `mapOf("price" to 7.5)`; values are String, a number or Boolean
@@ -95,6 +98,9 @@ object Respectlytics {
     @JvmOverloads
     fun track(eventName: String, properties: Map<String, Any?>? = null) {
         requireConfigured()
+
+        // The server refused the app key: nothing is sent until the app starts again
+        if (eventQueue!!.isAppKeyRefused) return
 
         // Validate event name
         if (eventName.isBlank()) {
@@ -138,6 +144,8 @@ object Respectlytics {
     @JvmStatic
     fun flush() {
         requireConfigured()
+
+        if (eventQueue!!.isAppKeyRefused) return
 
         CoroutineScope(Dispatchers.IO).launch {
             try {

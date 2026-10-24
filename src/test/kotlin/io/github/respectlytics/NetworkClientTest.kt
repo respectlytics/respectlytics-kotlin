@@ -14,6 +14,7 @@ import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.TimeUnit
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -194,13 +195,73 @@ class NetworkClientTest {
     }
 
     @Test
-    fun `test a 401 is not retried and keeps the events for the next flush, as before`() = runBlocking {
+    fun `test a 401 stops after exactly one request`() = runBlocking {
+        answer(401, 201, 201)
+
+        assertFailsWith<AppKeyRefusedException> {
+            client(maxNetworkRetries = 3).sendEvents(listOf(event("a"), event("b")))
+        }
+
+        assertEquals(1, requests().size, "no retry, and not one request per event")
+    }
+
+    @Test
+    fun `test a 401 on the resend without properties stops too`() = runBlocking {
+        answer(400, 401, 201)
+
+        assertFailsWith<AppKeyRefusedException> {
+            client().sendEvents(listOf(event("purchase", mapOf("plan" to "pro")), event("next")))
+        }
+
+        assertEquals(2, requests().size)
+    }
+
+    @Test
+    fun `test after a 401 nothing more is sent and track is ignored until configure is called again`() {
         answer(401)
+        val config = Configuration(
+            apiKey = "revoked-key",
+            baseURL = server.url("/api/v1").toString().trimEnd('/'),
+            maxBatchSize = 100,
+            flushInterval = 3_600_000
+        )
+        Respectlytics.configure(config, OkHttpNetworkClient(config, listOf(0L, 0L, 0L)))
+        try {
+            val log = warnings {
+                Respectlytics.track("a")
+                Respectlytics.track("b", mapOf("paywall" to "b"))
+                Respectlytics.flushAndWaitForTesting()
 
-        val undelivered = client(maxNetworkRetries = 3).sendEvents(listOf(event("a"), event("b")))
+                // Later tracks and flushes send nothing
+                Respectlytics.track("c")
+                Respectlytics.flush()
+                Respectlytics.flushAndWaitForTesting()
+                Respectlytics.track("d")
+                Respectlytics.flushAndWaitForTesting()
+            }
 
-        assertEquals(listOf("a", "b"), undelivered.map { it.eventName })
-        assertEquals(1, requests().size, "one refused key per flush, not one per event")
+            assertEquals(1, server.requestCount, "one refused request, nothing after it")
+            assertTrue(Respectlytics.queuedEventsForTesting().isEmpty(), "the queued events are dropped")
+            assertEquals(listOf(EventQueue.APP_KEY_REFUSED_MESSAGE), log.lines().filter { it.isNotBlank() })
+            assertEquals(
+                "[Respectlytics] The app key was refused (401). Check it in your app's Settings on " +
+                    "respectlytics.com. No events are sent until the app starts again.",
+                EventQueue.APP_KEY_REFUSED_MESSAGE
+            )
+
+            // configure() again starts over
+            answer(201)
+            Respectlytics.configure(config.copy(apiKey = "new-key"))
+            Respectlytics.track("e")
+            Respectlytics.flushAndWaitForTesting()
+
+            assertEquals(2, server.requestCount)
+            val last = requests().last()
+            assertEquals("new-key", last.getHeader("X-App-Key"))
+            assertEquals("e", body(last).asJsonObject.get("event_name").asString)
+        } finally {
+            Respectlytics.resetForTesting()
+        }
     }
 
     @Test
