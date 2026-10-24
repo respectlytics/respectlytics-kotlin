@@ -30,15 +30,15 @@ See [Properties and A/B tests](#properties-and-ab-tests).
 ## What's New in v3.0.0
 
 ⚠️ **Breaking Changes:**
-- **RAM-only event queue** — Event queue is now held exclusively in memory. Unsent events are lost on process termination. This is a deliberate privacy-first design choice: zero bytes are written to the user's device for analytics.
-- **Removed `Storage` class** — The internal persistence abstraction has been deleted entirely.
-- **Gson no longer used for queue serialization** — Gson is still used for JSON serialization of events sent over the network, but no longer for persisting events to storage.
+- **RAM-only event queue**: the event queue is now held exclusively in memory. Unsent events are lost on process termination. This is a deliberate privacy-first design choice: zero bytes are written to the user's device for analytics.
+- **Removed `Storage` class**: the internal persistence abstraction has been deleted entirely.
+- **Gson no longer used for queue serialization**: Gson is still used for JSON serialization of events sent over the network, but no longer for persisting events to storage.
 
 ## What's New in v2.2.0
 
-- **License changed to MIT** — SDKs are now fully open source
-- **Self-hosted server support** — documented `baseURL` configuration for self-hosted instances
-- **Privacy wording improvements** — removed regulatory compliance claims from code comments
+- **License changed to MIT**: the SDKs are now fully open source
+- **Self-hosted server support**: documented `baseURL` configuration for self-hosted instances
+- **Privacy wording improvements**: removed regulatory compliance claims from code comments
 
 ## What's New in v2.1.0
 
@@ -215,7 +215,7 @@ The SDK handles these automatically:
 |---------|----------|
 | **Session Management** | New session on app launch, rotates every 2 hours |
 | **Event Batching** | Events queued in memory and sent every 10 events or 30 seconds, one request per event |
-| **RAM-only Event Queue** | Events held in memory only — lost on force-quit by design |
+| **RAM-only Event Queue** | Events held in memory only, and lost on force-quit by design |
 | **Retry Logic** | Failed requests retry with exponential backoff (max 3 attempts) |
 | **Resource Protection** | Max queue size (100), event TTL (7 days), max retries (10) |
 
@@ -225,7 +225,7 @@ If the server refuses the app key (401), the SDK logs it once, drops the queued 
 
 ## Privacy Architecture
 
-Respectlytics uses anonymized identifiers stored only in device memory (RAM) that rotate automatically every two hours or upon app restart. IP addresses are processed transiently for approximate country lookup and immediately discarded—no personal data is ever persisted.
+Respectlytics uses anonymized identifiers stored only in device memory (RAM) that rotate automatically every two hours or upon app restart. IP addresses are processed transiently for approximate country lookup and then discarded; it is never stored.
 
 Our system is:
 - **Transparent** - Clear about what data is collected
@@ -266,7 +266,7 @@ No breaking changes. Existing code works as it is.
 
 ## Migration from v2.x
 
-v3.0.0 requires no changes to your public API calls. The only difference is that the event queue is now RAM-only — unsent events are lost on process termination instead of being persisted to storage. This is a privacy improvement, not an API change.
+v3.0.0 requires no changes to your public API calls. The only difference is that the event queue is now RAM-only: unsent events are lost on process termination instead of being persisted to storage. This is a privacy improvement, not an API change.
 
 If you're migrating from v2.0.x: from v3.1.0, `track()` takes properties again, and the server keeps only the ones declared in the app's Settings (see [Properties and A/B tests](#properties-and-ab-tests)). Remove the ones you will not declare:
 
@@ -321,7 +321,7 @@ MIT License. See [LICENSE](LICENSE) for details.
 
 ## Support
 
-- **Documentation:** https://respectlytics.com/sdk/
-- **API Reference:** https://respectlytics.com/api/v1/docs/
+- **Documentation:** [https://respectlytics.com/sdk/](https://respectlytics.com/sdk/?ref=respectlytics-github)
+- **API Reference:** [https://respectlytics.com/api/v1/docs/](https://respectlytics.com/api/v1/docs/?ref=respectlytics-github)
 - **Issues:** https://github.com/respectlytics/respectlytics-kotlin/issues
 - **Email:** respectlytics@loheden.com
