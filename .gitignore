@@ -27,6 +27,7 @@ local.properties
 # Compiled files
 # ------------------------------------------
 *.jar
+!gradle/wrapper/gradle-wrapper.jar
 *.class
 
 # ------------------------------------------

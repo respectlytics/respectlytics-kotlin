@@ -10,6 +10,10 @@ class RespectlyticsTest {
 
     private val testApiKey = "test-api-key-12345"
 
+    // Nothing listens here: a flush in these tests must never reach respectlytics.com
+    // with a made-up key (refused keys count toward a block of the address).
+    private val offlineURL = "http://127.0.0.1:9/api/v1"
+
     @After
     fun teardown() {
         // Reset Respectlytics state using the internal method
@@ -18,7 +22,7 @@ class RespectlyticsTest {
 
     @Test
     fun `test configure initializes SDK`() {
-        val config = Configuration(apiKey = testApiKey)
+        val config = Configuration(apiKey = testApiKey, baseURL = offlineURL)
 
         Respectlytics.configure(config)
 
@@ -39,7 +43,7 @@ class RespectlyticsTest {
 
     @Test
     fun `test isConfigured returns true after configure`() {
-        val config = Configuration(apiKey = testApiKey)
+        val config = Configuration(apiKey = testApiKey, baseURL = offlineURL)
         Respectlytics.configure(config)
 
         assertTrue(Respectlytics.isConfigured())
@@ -54,7 +58,7 @@ class RespectlyticsTest {
 
     @Test
     fun `test track with valid event name succeeds`() {
-        val config = Configuration(apiKey = testApiKey)
+        val config = Configuration(apiKey = testApiKey, baseURL = offlineURL)
         Respectlytics.configure(config)
 
         // Should not throw
@@ -63,7 +67,7 @@ class RespectlyticsTest {
 
     @Test
     fun `test track with empty event name fails gracefully`() {
-        val config = Configuration(apiKey = testApiKey)
+        val config = Configuration(apiKey = testApiKey, baseURL = offlineURL)
         Respectlytics.configure(config)
 
         // Should not throw, but should log warning
@@ -72,7 +76,7 @@ class RespectlyticsTest {
 
     @Test
     fun `test track with blank event name fails gracefully`() {
-        val config = Configuration(apiKey = testApiKey)
+        val config = Configuration(apiKey = testApiKey, baseURL = offlineURL)
         Respectlytics.configure(config)
 
         // Should not throw, but should log warning
@@ -81,7 +85,7 @@ class RespectlyticsTest {
 
     @Test
     fun `test track with long event name fails gracefully`() {
-        val config = Configuration(apiKey = testApiKey)
+        val config = Configuration(apiKey = testApiKey, baseURL = offlineURL)
         Respectlytics.configure(config)
 
         val longName = "a".repeat(101)
@@ -99,7 +103,7 @@ class RespectlyticsTest {
 
     @Test
     fun `test flush succeeds when configured`() {
-        val config = Configuration(apiKey = testApiKey)
+        val config = Configuration(apiKey = testApiKey, baseURL = offlineURL)
         Respectlytics.configure(config)
 
         // Should not throw
@@ -128,7 +132,7 @@ class RespectlyticsTest {
 
     @Test
     fun `test track creates events with correct platform`() {
-        val config = Configuration(apiKey = testApiKey)
+        val config = Configuration(apiKey = testApiKey, baseURL = offlineURL)
         Respectlytics.configure(config)
 
         // Track an event (platform should be "kotlin")
@@ -140,7 +144,7 @@ class RespectlyticsTest {
 
     @Test
     fun `test multiple events can be tracked`() {
-        val config = Configuration(apiKey = testApiKey)
+        val config = Configuration(apiKey = testApiKey, baseURL = offlineURL)
         Respectlytics.configure(config)
 
         // Track multiple events (no properties parameter since v2.1.0)
@@ -154,19 +158,19 @@ class RespectlyticsTest {
     @Test
     fun `test reconfigure is allowed`() {
         // Configure once
-        val config1 = Configuration(apiKey = testApiKey)
+        val config1 = Configuration(apiKey = testApiKey, baseURL = offlineURL)
         Respectlytics.configure(config1)
         assertTrue(Respectlytics.isConfigured())
 
         // Configure again (allowed in SDK)
-        val config2 = Configuration(apiKey = "different-key")
+        val config2 = Configuration(apiKey = "different-key", baseURL = offlineURL)
         Respectlytics.configure(config2)
         assertTrue(Respectlytics.isConfigured())
     }
 
     @Test
     fun `test resetForTesting clears configuration`() {
-        val config = Configuration(apiKey = testApiKey)
+        val config = Configuration(apiKey = testApiKey, baseURL = offlineURL)
         Respectlytics.configure(config)
         assertTrue(Respectlytics.isConfigured())
 
@@ -177,7 +181,7 @@ class RespectlyticsTest {
     @Test
     fun `test track API takes only eventName`() {
         // track() takes only eventName - no properties parameter (since v2.1.0)
-        val config = Configuration(apiKey = testApiKey)
+        val config = Configuration(apiKey = testApiKey, baseURL = offlineURL)
         Respectlytics.configure(config)
 
         // Only eventName is accepted
