@@ -151,6 +151,11 @@ internal class EventQueue(
      * Get current queue size.
      */
     fun size(): Int = queue.size
+
+    /**
+     * The events waiting in the queue, oldest first, without removing them.
+     */
+    fun snapshot(): List<Event> = queue.toList()
     
     /**
      * Shutdown the queue, flushing any remaining events.
@@ -167,6 +172,14 @@ internal class EventQueue(
         }
     }
     
+    /**
+     * Stop the queue's background flushing without sending what it holds.
+     */
+    fun shutdownWithoutFlush() {
+        flushJob?.cancel()
+        scope.cancel()
+    }
+
     /**
      * Start periodic auto-flush based on flushInterval.
      */

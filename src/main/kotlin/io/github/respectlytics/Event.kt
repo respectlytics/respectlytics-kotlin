@@ -6,11 +6,13 @@ import com.google.gson.annotations.SerializedName
 /**
  * Represents an analytics event to be sent to the Respectlytics API.
  *
- * v2.1.0: Events contain only 4 fields (strict API allowlist):
+ * Events contain 4 fields (strict API allowlist), plus optional properties:
  * - event_name: What happened
  * - timestamp: When it happened
  * - session_id: Groups events in a session (RAM-only)
  * - platform: "kotlin" or "android"
+ * - properties (v3.1.0, optional): what passed [PropertyFilter]; the server keeps
+ *   only those declared in the app's Settings. Left out of the JSON when null.
  *
  * Country is derived server-side from IP, then IP is immediately discarded.
  */
@@ -25,7 +27,10 @@ data class Event(
     val sessionId: String,
 
     @SerializedName("platform")
-    val platform: String = "kotlin"
+    val platform: String = "kotlin",
+
+    @SerializedName("properties")
+    val properties: Map<String, Any>? = null
 ) {
     companion object {
         private val gson = Gson()

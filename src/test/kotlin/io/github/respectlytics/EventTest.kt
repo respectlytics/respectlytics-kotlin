@@ -1,5 +1,6 @@
 package io.github.respectlytics
 
+import com.google.gson.JsonParser
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -58,6 +59,42 @@ class EventTest {
         assertFalse(json.contains("app_version"), "Should not contain app_version")
         assertFalse(json.contains("locale"), "Should not contain locale")
         assertFalse(json.contains("screen"), "Should not contain screen")
+    }
+
+    @Test
+    fun `test event without properties has no properties key at all`() {
+        val event = Event(
+            eventName = "app_opened",
+            timestamp = "2025-12-06T10:00:00Z",
+            sessionId = "sess1"
+        )
+
+        val json = JsonParser.parseString(event.toJson()).asJsonObject
+
+        assertEquals(setOf("event_name", "timestamp", "session_id", "platform"), json.keySet())
+    }
+
+    @Test
+    fun `test event with properties carries them as a JSON object`() {
+        val event = Event(
+            eventName = "purchase",
+            timestamp = "2025-12-06T10:00:00Z",
+            sessionId = "sess1",
+            properties = mapOf("paywall" to "b", "price" to 7.5, "seats" to 3, "trial" to true)
+        )
+
+        val json = JsonParser.parseString(event.toJson()).asJsonObject
+        val properties = json.getAsJsonObject("properties")
+
+        assertEquals(setOf("event_name", "timestamp", "session_id", "platform", "properties"), json.keySet())
+        assertEquals(setOf("paywall", "price", "seats", "trial"), properties.keySet())
+        assertEquals("b", properties.get("paywall").asString)
+        assertTrue(properties.get("price").asJsonPrimitive.isNumber)
+        assertEquals(7.5, properties.get("price").asDouble)
+        assertTrue(properties.get("seats").asJsonPrimitive.isNumber)
+        assertEquals(3, properties.get("seats").asInt)
+        assertTrue(properties.get("trial").asJsonPrimitive.isBoolean)
+        assertEquals(true, properties.get("trial").asBoolean)
     }
 
     @Test

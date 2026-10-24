@@ -2,7 +2,7 @@
 
 Official Respectlytics SDK for Kotlin/JVM and Android. Privacy-first, session-based analytics with zero persistent device identifiers.
 
-[![Version](https://img.shields.io/badge/version-3.0.0-purple.svg)](https://github.com/respectlytics/respectlytics-kotlin/releases/tag/v3.0.0)
+[![Version](https://img.shields.io/badge/version-3.1.0-purple.svg)](https://github.com/respectlytics/respectlytics-kotlin/releases/tag/v3.1.0)
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.8+-purple.svg)](https://kotlinlang.org)
 [![Platform](https://img.shields.io/badge/platform-JVM%20%7C%20Android%207%2B-lightgrey.svg)](https://kotlinlang.org)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -11,13 +11,20 @@ Official Respectlytics SDK for Kotlin/JVM and Android. Privacy-first, session-ba
 
 Respectlytics helps developers avoid collecting personal data in the first place. We believe the best way to handle sensitive data is to never collect it.
 
-Our SDK collects only 4 fields (a 5th, `country`, is derived server-side):
+Our SDK sends 4 fields with every event (a 5th, `country`, is derived server-side):
 - `event_name` - What happened
 - `timestamp` - When it happened
 - `session_id` - Groups events in a session (RAM-only, auto-rotates)
 - `platform` - "kotlin" or "android"
 
-That's it. No device identifiers, no fingerprinting, no persistent tracking.
+No device identifiers, no fingerprinting, no persistent tracking.
+An event can also carry properties you declare, such as an A/B test variant.
+See [Properties and A/B tests](#properties-and-ab-tests).
+
+## What's New in v3.1.0
+
+- **Event properties:** `track(eventName, properties)`, filtered on the device to the shapes the server can keep. See [Properties and A/B tests](#properties-and-ab-tests). A call with an event name alone works and is sent exactly as before.
+- **Java 17 or later:** v3.0.0 was built for Java 21 and could not be loaded on earlier versions.
 
 ## What's New in v3.0.0
 
@@ -45,7 +52,7 @@ That's it. No device identifiers, no fingerprinting, no persistent tracking.
 
 ```kotlin
 dependencies {
-    implementation("io.github.respectlytics:respectlytics-kotlin:3.0.0")
+    implementation("io.github.respectlytics:respectlytics-kotlin:3.1.0")
 }
 ```
 
@@ -53,7 +60,7 @@ dependencies {
 
 ```groovy
 dependencies {
-    implementation 'io.github.respectlytics:respectlytics-kotlin:3.0.0'
+    implementation 'io.github.respectlytics:respectlytics-kotlin:3.1.0'
 }
 ```
 
@@ -63,7 +70,7 @@ dependencies {
 <dependency>
     <groupId>io.github.respectlytics</groupId>
     <artifactId>respectlytics-kotlin</artifactId>
-    <version>3.0.0</version>
+    <version>3.1.0</version>
 </dependency>
 ```
 
@@ -123,14 +130,22 @@ Respectlytics.configure(Configuration(
 ))
 ```
 
-### `track(eventName: String)`
+### `track(eventName: String, properties: Map<String, Any?>? = null)`
 
-Track an event.
+Track an event, with optional properties.
 
 ```kotlin
 Respectlytics.track("purchase")
 Respectlytics.track("button_clicked")
+Respectlytics.track("paywall_viewed", mapOf("paywall" to "b"))
 ```
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `eventName` | `String` | Yes | Name of the event, at most 100 characters |
+| `properties` | `Map<String, Any?>?` | No | Names to a `String`, a number or a `Boolean`. See [Properties and A/B tests](#properties-and-ab-tests). |
+
+From Java, `Respectlytics.track("app_opened")` works as before, and properties are a plain map: `Respectlytics.track("paywall_viewed", Map.of("paywall", "b"))`.
 
 ### `flush()`
 
@@ -149,6 +164,35 @@ if (Respectlytics.isConfigured()) {
     Respectlytics.track("app_launched")
 }
 ```
+
+## Properties and A/B tests
+
+An event can carry properties, such as the paywall variant a person saw.
+The server keeps a property on paid plans, once you declare it in the app's Settings on respectlytics.com.
+On the free plan the server drops every property.
+You declare a property as a list of values, or as a number, which is kept as a band such as "5 to 10".
+
+```kotlin
+// An A/B test: which paywall variant was shown
+Respectlytics.track("paywall_viewed", mapOf("paywall" to "b"))
+
+// A number, kept as a band
+Respectlytics.track("checkout_started", mapOf("price" to 7.5))
+```
+
+What is dropped:
+
+- A property you have not declared, and a value that is not on its list. The server drops these.
+- Text that does not fit the shape of a value. A value starts with a letter or digit and holds at most 40 letters, digits, spaces, dots, underscores or hyphens. Anything else, such as an email address, a URL or anything over 40 characters, is dropped on the device and never sent. A short text that fits this shape is sent, and the server drops it unless it is one of your declared values.
+- A name that is not lowercase letters, digits and underscores, starting with a letter, at most 40 characters.
+- A number that is not finite, and any value that is not a `String`, a number or a `Boolean`. Use `true` and `false` for a property declared with those two values.
+- Every property after the first 20 that passed.
+
+The event itself is always sent, with the properties that passed.
+The SDK logs which names it dropped and why, never the values.
+The SDK does not know what you declared, and it makes no extra network call to find out.
+
+A self-hosted Community Edition server keeps no properties, and the event is still kept.
 
 ## 🔄 Automatic Session Management
 
@@ -190,7 +234,7 @@ Our system is:
 | Device fingerprints | Can identify users without consent |
 | Persistent user IDs | Enables cross-session tracking |
 | IP addresses | Used only transiently for geolocation, never stored |
-| Custom properties | Prevents accidental PII collection |
+| Undeclared properties and free text | Dropped on the device or by the server; only declared values, and numbers as bands, are stored |
 
 ### What We DO Collect
 
@@ -200,16 +244,25 @@ Our system is:
 | Timestamp | When the event occurred |
 | Session ID | Group events in a session (RAM-only) |
 | Platform | Segment analytics by platform |
+| Properties you declare (optional) | A value from your list, or a number as a band |
 
 ### Server-Side Only
 
 Country is derived server-side from IP addresses, then IP is immediately discarded.
 
+## Migration from v3.0.x
+
+No breaking changes. Existing code works as it is.
+
+- `track()` takes optional properties as a second argument. See [Properties and A/B tests](#properties-and-ab-tests).
+- The JSON of an event without properties is unchanged.
+- The SDK needs Java 17 or later (v3.0.0 needed Java 21).
+
 ## Migration from v2.x
 
 v3.0.0 requires no changes to your public API calls. The only difference is that the event queue is now RAM-only — unsent events are lost on process termination instead of being persisted to storage. This is a privacy improvement, not an API change.
 
-If you're migrating from v2.0.x, also remove any `properties` parameter from `track()` calls:
+If you're migrating from v2.0.x: from v3.1.0, `track()` takes properties again, and the server keeps only the ones declared in the app's Settings (see [Properties and A/B tests](#properties-and-ab-tests)). Remove the ones you will not declare:
 
 ```diff
   Respectlytics.configure(Configuration(apiKey = "your-api-key"))
@@ -221,7 +274,7 @@ That's it!
 
 ## Requirements
 
-- **JVM:** Java 8+ or Kotlin 1.8+
+- **JVM:** Java 17+, Kotlin 1.8+
 - **Android:** API 24+ (Android 7.0+)
 
 ## Dependencies
