@@ -24,6 +24,7 @@ See [Properties and A/B tests](#properties-and-ab-tests).
 ## What's New in v3.1.0
 
 - **Event properties:** `track(eventName, properties)`, filtered on the device to the shapes the server can keep. See [Properties and A/B tests](#properties-and-ab-tests). A call with an event name alone works and is sent exactly as before.
+- **One request per event:** each event is sent as its own request, the form the API reads. v3.0.0 sent the queued events as one list, which the API refuses.
 - **Java 17 or later:** v3.0.0 was built for Java 21 and could not be loaded on earlier versions.
 
 ## What's New in v3.0.0
@@ -193,6 +194,7 @@ The SDK logs which names it dropped and why, never the values.
 The SDK does not know what you declared, and it makes no extra network call to find out.
 
 A self-hosted Community Edition server keeps no properties, and the event is still kept.
+If the server is older than this SDK and refuses the properties, the SDK sends the event again without them.
 
 ## 🔄 Automatic Session Management
 
@@ -212,10 +214,13 @@ The SDK handles these automatically:
 | Feature | Behavior |
 |---------|----------|
 | **Session Management** | New session on app launch, rotates every 2 hours |
-| **Event Batching** | Events queued in memory and sent in batches (max 10 events or 30 seconds) |
+| **Event Batching** | Events queued in memory and sent every 10 events or 30 seconds, one request per event |
 | **RAM-only Event Queue** | Events held in memory only — lost on force-quit by design |
 | **Retry Logic** | Failed requests retry with exponential backoff (max 3 attempts) |
 | **Resource Protection** | Max queue size (100), event TTL (7 days), max retries (10) |
+
+An event the server refuses as invalid (400) is dropped, so it never holds up the events after it.
+Once the server has confirmed an event, the SDK does not send it again.
 
 ## Privacy Architecture
 

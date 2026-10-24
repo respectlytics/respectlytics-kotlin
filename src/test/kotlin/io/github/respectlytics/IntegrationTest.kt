@@ -1,5 +1,6 @@
 package io.github.respectlytics
 
+import kotlinx.coroutines.runBlocking
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -218,6 +219,80 @@ class IntegrationTest {
         } else {
             println("  ❌ FAILED: Sessions are identical")
             throw AssertionError("Session IDs should be unique")
+        }
+    }
+
+    @Test
+    fun `test 7 - the SDK's own transport delivers a flush of several events`() {
+        println("🧪 Test 7: SDK transport delivers queued events...")
+
+        if (!serverRunning) {
+            println("  ⚠️  SKIPPED: Django server not running on port 8080")
+            return
+        }
+
+        if (testApiKey.isEmpty()) {
+            println("  ⚠️  SKIPPED: RESPECTLYTICS_TEST_API_KEY not set")
+            return
+        }
+
+        val config = Configuration(apiKey = testApiKey, baseURL = baseUrl, maxNetworkRetries = 1)
+        val events = listOf("sdk_transport_1", "sdk_transport_2").map { name ->
+            Event(eventName = name, timestamp = dateFormat.format(Date()), sessionId = "e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2")
+        }
+
+        val undelivered = runBlocking { OkHttpNetworkClient(config).sendEvents(events) }
+
+        if (undelivered.isEmpty()) {
+            println("  ✅ PASSED: Both events delivered")
+        } else {
+            throw AssertionError("The SDK's transport did not deliver: ${undelivered.map { it.eventName }}")
+        }
+    }
+
+    /**
+     * Run against an app that declared `paywall` (a, b), `plan` (free, pro) and `price`
+     * (a number): the server keeps paywall, plan and price's band, and never sees the
+     * properties the SDK drops on the device.
+     */
+    @Test
+    fun `test 8 - track with properties reaches the server through the queue`() {
+        println("🧪 Test 8: track() with properties, end to end...")
+
+        if (!serverRunning) {
+            println("  ⚠️  SKIPPED: Django server not running on port 8080")
+            return
+        }
+
+        if (testApiKey.isEmpty()) {
+            println("  ⚠️  SKIPPED: RESPECTLYTICS_TEST_API_KEY not set")
+            return
+        }
+
+        Respectlytics.configure(Configuration(apiKey = testApiKey, baseURL = baseUrl, maxNetworkRetries = 1))
+        try {
+            Respectlytics.track("paywall_viewed", mapOf("paywall" to "b"))
+            Respectlytics.track(
+                "purchase",
+                mapOf(
+                    "plan" to "pro",
+                    "price" to 7.5,
+                    "email" to "someone@example.com", // invalid value: never sent
+                    "Plan" to "pro",                  // invalid name: never sent
+                    "undeclared" to "x"               // sent, and dropped by the server
+                )
+            )
+            Respectlytics.track("app_opened")
+            Respectlytics.flushAndWaitForTesting()
+
+            val left = Respectlytics.queuedEventsForTesting()
+            if (left.isEmpty()) {
+                println("  ✅ PASSED: All 3 events delivered")
+            } else {
+                throw AssertionError("Not delivered: ${left.map { it.eventName }}")
+            }
+        } finally {
+            Respectlytics.resetForTesting()
         }
     }
 

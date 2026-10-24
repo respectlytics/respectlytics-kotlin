@@ -12,115 +12,177 @@ import java.util.concurrent.TimeUnit
  * NetworkClient interface for sending events to the Respectlytics API.
  */
 internal interface NetworkClient {
-    suspend fun sendEvents(events: List<Event>): Boolean
+    /**
+     * Send the events, in order.
+     *
+     * @return the events that were not delivered, in order (empty when every one was)
+     */
+    suspend fun sendEvents(events: List<Event>): List<Event>
 }
 
 /**
  * Real HTTP implementation using OkHttp3 with retry logic.
- * 
- * Retry Strategy:
+ *
+ * The API reads one event per request (a JSON object), so each event is its own
+ * POST. Until v3.1.0 a flush was sent as one JSON array, which the API refuses.
+ *
+ * Retry Strategy (per event):
  * - 3 attempts max with exponential backoff (2s, 4s, 8s)
  * - Retries on: network errors (IOException), 429 (rate limit), 5xx (server errors)
  * - No retry on: 4xx client errors (except 429) - these are permanent failures
- * - Max duration per call: ~14 seconds
+ * - Max duration per event: ~14 seconds
+ *
+ * A 400 is final, since no retry can change it. An event with properties is
+ * then sent once more without them, for a server older than v3.1.0 (a
+ * self-hosted Community Edition not yet updated) that refuses the properties
+ * field. If the server refuses the event itself, it is dropped, so it never
+ * holds up the events queued after it.
+ *
+ * Any other failure concerns the account or the connection (a wrong key, a plan
+ * at its limit, the network down), so that event and the rest wait for the next
+ * flush instead of each failing in turn. An event the server accepted is never
+ * sent again.
  */
 internal class OkHttpNetworkClient(
-    private val configuration: Configuration
+    private val configuration: Configuration,
+    private val retryDelaysMs: List<Long> = listOf(2000L, 4000L, 8000L) // Exponential backoff
 ) : NetworkClient {
-    
+
     private val client = OkHttpClient.Builder()
         .connectTimeout(configuration.connectTimeout, TimeUnit.MILLISECONDS)
         .readTimeout(configuration.readTimeout, TimeUnit.MILLISECONDS)
         .writeTimeout(configuration.writeTimeout, TimeUnit.MILLISECONDS)
         .build()
-    
+
     private val mediaType = "application/json; charset=utf-8".toMediaType()
-    private val retryDelaysMs = listOf(2000L, 4000L, 8000L) // Exponential backoff
-    
-    override suspend fun sendEvents(events: List<Event>): Boolean {
-        var attempt = 0
-        var lastStatusCode = 0
-        
-        while (attempt < configuration.maxNetworkRetries) {
-            try {
-                val result = sendRequest(events)
-                lastStatusCode = result.statusCode
-                
-                if (result.success) {
+
+    /** How one request ended, after its retries. */
+    private enum class Outcome { DELIVERED, BAD_REQUEST, FAILED }
+
+    override suspend fun sendEvents(events: List<Event>): List<Event> {
+        for ((index, event) in events.withIndex()) {
+            if (!sendEvent(event)) {
+                // This event and the ones after it wait for the next flush
+                return events.subList(index, events.size).toList()
+            }
+        }
+        return emptyList()
+    }
+
+    /**
+     * Send one event. Returns false when it should be tried again later; true when
+     * the server has it, or refused it with a 400 and it was dropped.
+     */
+    private suspend fun sendEvent(event: Event): Boolean {
+        when (sendWithRetry(event)) {
+            Outcome.DELIVERED -> return true
+            Outcome.FAILED -> return false
+            Outcome.BAD_REQUEST -> Unit
+        }
+
+        if (!event.properties.isNullOrEmpty()) {
+            when (sendWithRetry(event.copy(properties = null))) {
+                Outcome.DELIVERED -> {
+                    logWarning("Server refused the properties, event sent without them")
                     return true
                 }
-                
+                Outcome.FAILED -> return false
+                Outcome.BAD_REQUEST -> Unit
+            }
+        }
+
+        logWarning("Server refused an event (400), dropped")
+        return true
+    }
+
+    private suspend fun sendWithRetry(event: Event): Outcome {
+        // At least one attempt, whatever maxNetworkRetries says
+        val attempts = maxOf(1, configuration.maxNetworkRetries)
+        var attempt = 0
+        var lastStatusCode = 0
+
+        while (attempt < attempts) {
+            try {
+                lastStatusCode = sendRequest(event)
+
+                if (lastStatusCode in 200..299) {
+                    return Outcome.DELIVERED
+                }
+
+                if (lastStatusCode == 400) {
+                    return Outcome.BAD_REQUEST
+                }
+
                 // Don't retry on client errors (4xx) except rate limiting (429)
                 if (lastStatusCode in 400..499 && lastStatusCode != 429) {
                     println("Respectlytics: Client error $lastStatusCode - will not retry")
-                    return false
+                    return Outcome.FAILED
                 }
-                
-                println("Respectlytics: Request failed with status $lastStatusCode, attempt ${attempt + 1}/${configuration.maxNetworkRetries}")
-                
+
+                println("Respectlytics: Request failed with status $lastStatusCode, attempt ${attempt + 1}/$attempts")
+
             } catch (e: IOException) {
-                println("Respectlytics: Network error on attempt ${attempt + 1}/${configuration.maxNetworkRetries}: ${e.message}")
+                println("Respectlytics: Network error on attempt ${attempt + 1}/$attempts: ${e.message}")
             } catch (e: Exception) {
                 println("Respectlytics: Unexpected error: ${e.message}")
-                return false // Don't retry on unexpected errors
+                return Outcome.FAILED // Don't retry on unexpected errors
             }
-            
+
             // Apply exponential backoff delay before next retry
-            if (attempt < configuration.maxNetworkRetries - 1) {
-                delay(retryDelaysMs[attempt])
+            if (attempt < attempts - 1) {
+                delay(retryDelaysMs[minOf(attempt, retryDelaysMs.lastIndex)])
             }
             attempt++
         }
-        
+
         println("Respectlytics: All retry attempts exhausted (last status: $lastStatusCode)")
-        return false
+        return Outcome.FAILED
     }
-    
-    private data class RequestResult(val success: Boolean, val statusCode: Int)
-    
-    private fun sendRequest(events: List<Event>): RequestResult {
+
+    private fun logWarning(message: String) {
+        System.err.println("[Respectlytics] ⚠️ $message")
+    }
+
+    /**
+     * POST one event as a JSON object and return the status code.
+     */
+    private fun sendRequest(event: Event): Int {
         val url = "${configuration.baseURL}/events/"
-        
-        // Serialize events to JSON array
-        val json = events.joinToString(",", "[", "]") { it.toJson() }
-        val body = json.toRequestBody(mediaType)
-        
+        val body = event.toJson().toRequestBody(mediaType)
+
         val request = Request.Builder()
             .url(url)
             .post(body)
             .addHeader("Content-Type", "application/json")
             .addHeader("X-App-Key", configuration.apiKey)
             .build()
-        
+
         client.newCall(request).execute().use { response ->
-            return RequestResult(
-                success = response.isSuccessful,
-                statusCode = response.code
-            )
+            return response.code
         }
     }
 }
 
 /**
  * Mock NetworkClient for testing purposes.
- * 
+ *
  * Tracks all sent events and can be configured to simulate failures.
  */
 internal class MockNetworkClient : NetworkClient {
     val sentEvents = mutableListOf<List<Event>>()
     var shouldFail = false
     var failureCount = 0
-    
-    override suspend fun sendEvents(events: List<Event>): Boolean {
+
+    override suspend fun sendEvents(events: List<Event>): List<Event> {
         return if (shouldFail) {
             failureCount++
-            false
+            events
         } else {
             sentEvents.add(events)
-            true
+            emptyList()
         }
     }
-    
+
     fun reset() {
         sentEvents.clear()
         shouldFail = false

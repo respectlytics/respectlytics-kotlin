@@ -247,4 +247,50 @@ class EventQueueTest {
         assertEquals(0, queue2.size(), "New queue instance should start empty (RAM-only)")
         queue2.shutdown()
     }
+
+    @Test
+    fun `test only the events not yet sent are re-queued`() = runBlocking {
+        // Sends the first event of each flush, then fails: the rest are not yet sent
+        val networkClient = object : NetworkClient {
+            val sent = mutableListOf<String>()
+            override suspend fun sendEvents(events: List<Event>): List<Event> {
+                sent.add(events.first().eventName)
+                return events.drop(1)
+            }
+        }
+        val queue = EventQueue(networkClient, createTestConfig())
+
+        queue.add(createTestEvent("first"))
+        queue.add(createTestEvent("second"))
+        queue.add(createTestEvent("third"))
+        queue.flush()
+
+        assertEquals(listOf("second", "third"), queue.snapshot().map { it.eventName })
+
+        queue.flush()
+        queue.flush()
+
+        assertEquals(listOf("first", "second", "third"), networkClient.sent, "no event is sent twice")
+        assertEquals(0, queue.size())
+        queue.shutdown()
+    }
+
+    @Test
+    fun `test a re-queued event is not mixed up with an equal one that was sent`() = runBlocking {
+        // Two events can be equal (same name, second and session): only the unsent one comes back
+        val first = createTestEvent("same")
+        val second = first.copy()
+        val networkClient = object : NetworkClient {
+            override suspend fun sendEvents(events: List<Event>): List<Event> = events.drop(1)
+        }
+        val queue = EventQueue(networkClient, createTestConfig())
+
+        queue.add(first)
+        queue.add(second)
+        queue.flush()
+
+        assertEquals(1, queue.size())
+        assertTrue(queue.snapshot().single() === second)
+        queue.shutdown()
+    }
 }

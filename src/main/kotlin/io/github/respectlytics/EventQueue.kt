@@ -70,7 +70,9 @@ internal class EventQueue(
      * - Removes events older than eventTTL
      * - Filters out events that exceeded maxEventRetries
      * - Increments retry counter on failure
-     * - Re-queues failed events (if under retry limit)
+     * - Re-queues only the events not yet sent (if under retry limit): an event
+     *   the server accepted, or refused with a 400 and was dropped, is never
+     *   sent again
      */
     suspend fun flush() {
         val eventsToSend = mutableListOf<Event>()
@@ -117,21 +119,21 @@ internal class EventQueue(
         
         // Attempt to send events
         try {
-            val success = networkClient.sendEvents(retryableEvents)
-            
+            val undelivered = networkClient.sendEvents(retryableEvents)
+            // By identity: two events can be equal (same name, second, session and properties)
+            val failed = retryableEvents.filter { event -> undelivered.any { it === event } }
+            val delivered = retryableEvents.filter { event -> failed.none { it === event } }
+
             synchronized(this) {
-                if (success) {
-                    // Success - clear retry counts
-                    retryableEvents.forEach { event ->
-                        eventRetryCount.remove(event.timestamp)
-                    }
-                } else {
-                    // Failed - increment retry counts and re-queue
-                    retryableEvents.forEach { event ->
-                        val currentRetries = eventRetryCount.getOrDefault(event.timestamp, 0)
-                        eventRetryCount[event.timestamp] = currentRetries + 1
-                        queue.offer(event)
-                    }
+                // Sent (or refused with a 400 and dropped) - clear retry counts
+                delivered.forEach { event ->
+                    eventRetryCount.remove(event.timestamp)
+                }
+                // Not delivered - increment retry counts and re-queue
+                failed.forEach { event ->
+                    val currentRetries = eventRetryCount.getOrDefault(event.timestamp, 0)
+                    eventRetryCount[event.timestamp] = currentRetries + 1
+                    queue.offer(event)
                 }
             }
         } catch (e: Exception) {
